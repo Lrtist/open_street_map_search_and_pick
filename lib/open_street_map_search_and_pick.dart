@@ -9,6 +9,10 @@ import 'package:geolocator/geolocator.dart';
 import 'package:http/http.dart' as http;
 import 'package:latlong2/latlong.dart';
 import 'package:open_street_map_search_and_pick/widgets/wide_button.dart';
+import 'package:open_street_map_search_and_pick/widgets/osm_widgets.dart';
+
+// Export des nouveaux widgets modulaires
+export 'package:open_street_map_search_and_pick/widgets/osm_widgets.dart';
 
 class OpenStreetMapSearchAndPick extends StatefulWidget {
   final void Function(PickedData pickedData) onPicked;
