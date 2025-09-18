@@ -4,7 +4,7 @@ import 'package:latlong2/latlong.dart';
 import '../controllers/osm_controller.dart';
 
 /// Widget de carte indépendant pour OpenStreetMap
-class OSMMapView extends StatelessWidget {
+class OSMMapView extends StatefulWidget {
   final OSMController controller;
   final double? width;
   final double? height;
@@ -29,6 +29,8 @@ class OSMMapView extends StatelessWidget {
   final EdgeInsetsGeometry? controlsMargin;
   final AlignmentGeometry? controlsAlignment;
   final VoidCallback? onCurrentLocationPressed;
+  final void Function(LatLng center, Map<String, dynamic>? address)? onLocationChanged;
+  final void Function(OSMdata address)? onAddressSelected;
 
   const OSMMapView({
     Key? key,
@@ -60,20 +62,62 @@ class OSMMapView extends StatelessWidget {
     this.controlsMargin,
     this.controlsAlignment,
     this.onCurrentLocationPressed,
+    this.onLocationChanged,
+    this.onAddressSelected,
   }) : super(key: key);
+
+  @override
+  State<OSMMapView> createState() => _OSMMapViewState();
+}
+
+class _OSMMapViewState extends State<OSMMapView> {
+  void _onControllerLocationChanged(LatLng c, Map<String, dynamic>? a) {
+    widget.onLocationChanged?.call(c, a);
+  }
+
+  void _onControllerAddressSelected(OSMdata d) {
+    widget.onAddressSelected?.call(d);
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    widget.controller.ensureMapListener();
+    widget.controller.addLocationChangedListener(_onControllerLocationChanged);
+    widget.controller.addAddressSelectedListener(_onControllerAddressSelected);
+  }
+
+  @override
+  void didUpdateWidget(covariant OSMMapView oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.controller != widget.controller) {
+      oldWidget.controller.removeLocationChangedListener(_onControllerLocationChanged);
+      oldWidget.controller.removeAddressSelectedListener(_onControllerAddressSelected);
+      widget.controller.ensureMapListener();
+      widget.controller.addLocationChangedListener(_onControllerLocationChanged);
+      widget.controller.addAddressSelectedListener(_onControllerAddressSelected);
+    }
+  }
+
+  @override
+  void dispose() {
+    widget.controller.removeLocationChangedListener(_onControllerLocationChanged);
+    widget.controller.removeAddressSelectedListener(_onControllerAddressSelected);
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
     // S'assurer que les mouvements de la carte mettront à jour l'adresse
-    controller.ensureMapListener();
+    widget.controller.ensureMapListener();
     return Container(
-      width: width,
-      height: height,
+      width: widget.width,
+      height: widget.height,
       child: Stack(
         children: [
           _buildMap(),
-          if (showLocationPin) _buildLocationPin(),
-          if (showZoomControls || showCurrentLocationButton) _buildControls(),
+          if (widget.showLocationPin) _buildLocationPin(),
+          if (widget.showZoomControls || widget.showCurrentLocationButton) _buildControls(),
         ],
       ),
     );
@@ -81,17 +125,17 @@ class OSMMapView extends StatelessWidget {
 
   Widget _buildMap() {
     return FlutterMap(
-      mapController: controller.mapController,
+      mapController: widget.controller.mapController,
       options: MapOptions(
-        center: initialCenter,
-        zoom: initialZoom,
-        maxZoom: maxZoom,
-        minZoom: minZoom,
+        center: widget.initialCenter,
+        zoom: widget.initialZoom,
+        maxZoom: widget.maxZoom,
+        minZoom: widget.minZoom,
       ),
       children: [
         TileLayer(
-          urlTemplate: tileLayerUrl,
-          subdomains: tileLayerSubdomains,
+          urlTemplate: widget.tileLayerUrl,
+          subdomains: widget.tileLayerSubdomains,
         ),
       ],
     );
@@ -105,16 +149,16 @@ class OSMMapView extends StatelessWidget {
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
               Text(
-                locationPinText,
-                style: locationPinTextStyle,
+                widget.locationPinText,
+                style: widget.locationPinTextStyle,
                 textAlign: TextAlign.center,
               ),
               Padding(
                 padding: const EdgeInsets.only(bottom: 50),
                 child: Icon(
-                  locationPinIcon,
+                  widget.locationPinIcon,
                   size: 50,
-                  color: locationPinIconColor,
+                  color: widget.locationPinIconColor,
                 ),
               ),
             ],
@@ -131,24 +175,24 @@ class OSMMapView extends StatelessWidget {
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          if (showZoomControls) ...[
+          if (widget.showZoomControls) ...[
             _buildControlButton(
-              icon: zoomInIcon,
-              onPressed: () => controller.zoomIn(),
+              icon: widget.zoomInIcon,
+              onPressed: () => widget.controller.zoomIn(),
               heroTag: 'zoom_in',
             ),
             const SizedBox(height: 8),
             _buildControlButton(
-              icon: zoomOutIcon,
-              onPressed: () => controller.zoomOut(),
+              icon: widget.zoomOutIcon,
+              onPressed: () => widget.controller.zoomOut(),
               heroTag: 'zoom_out',
             ),
             const SizedBox(height: 8),
           ],
-          if (showCurrentLocationButton)
+          if (widget.showCurrentLocationButton)
             _buildControlButton(
-              icon: currentLocationIcon,
-              onPressed: onCurrentLocationPressed ?? () {},
+              icon: widget.currentLocationIcon,
+              onPressed: widget.onCurrentLocationPressed ?? () {},
               heroTag: 'current_location',
             ),
         ],
@@ -164,11 +208,11 @@ class OSMMapView extends StatelessWidget {
     return FloatingActionButton(
       heroTag: heroTag,
       mini: true,
-      backgroundColor: buttonColor,
+      backgroundColor: widget.buttonColor,
       onPressed: onPressed,
       child: Icon(
         icon,
-        color: buttonTextColor,
+        color: widget.buttonTextColor,
         size: 20,
       ),
     );

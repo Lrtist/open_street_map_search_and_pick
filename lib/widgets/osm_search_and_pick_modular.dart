@@ -45,6 +45,18 @@ class OpenStreetMapSearchAndPickModular extends StatefulWidget {
   // Placement du champ
   final SearchFieldPlacement searchFieldPlacement;
   final double topSpacing;
+  // Apparence avancée du champ
+  final Color searchBorderColor;
+  final double searchBorderWidth;
+  final BorderRadius? searchBorderRadius;
+  final TextStyle? searchTextStyle;
+  final InputDecoration? searchDecoration;
+  final EdgeInsetsGeometry? searchMargin;
+  final EdgeInsetsGeometry? searchPadding;
+  final Color? searchHintTextColor;
+  // Callbacks
+  final void Function(OSMdata address)? onAddressSelected;
+  final void Function(LatLng center, Map<String, dynamic>? address)? onLocationChanged;
 
   const OpenStreetMapSearchAndPickModular({
     Key? key,
@@ -80,6 +92,16 @@ class OpenStreetMapSearchAndPickModular extends StatefulWidget {
     this.autovalidateMode = AutovalidateMode.onUserInteraction,
     this.searchFieldPlacement = SearchFieldPlacement.overlay,
     this.topSpacing = 12.0,
+    this.searchBorderColor = Colors.blue,
+    this.searchBorderWidth = 1.0,
+    this.searchBorderRadius,
+    this.searchTextStyle,
+    this.searchDecoration,
+    this.searchMargin,
+    this.searchPadding,
+    this.searchHintTextColor,
+    this.onAddressSelected,
+    this.onLocationChanged,
   }) : super(key: key);
 
   @override
@@ -184,6 +206,8 @@ class _OpenStreetMapSearchAndPickModularState
                         buttonColor: widget.buttonColor,
                         buttonTextColor: widget.buttonTextColor,
                         onCurrentLocationPressed: _onCurrentLocationPressed,
+                        onLocationChanged: widget.onLocationChanged,
+                        onAddressSelected: widget.onAddressSelected,
                       ),
                     ),
                     // Champ en overlay
@@ -197,7 +221,13 @@ class _OpenStreetMapSearchAndPickModularState
                           child: OSMSearchField(
                             controller: _osmController,
                             hintText: widget.hintText,
-                            borderColor: widget.buttonColor,
+                            borderColor: widget.searchBorderColor,
+                            borderWidth: widget.searchBorderWidth,
+                            borderRadius: widget.searchBorderRadius,
+                            textStyle: widget.searchTextStyle,
+                            decoration: widget.searchDecoration,
+                            margin: widget.searchMargin,
+                            padding: widget.searchPadding,
                             backgroundColor: widget.searchFieldBackgroundColor,
                             prefixIcon: widget.searchFieldPrefixIcon,
                             requiredField: widget.requiredField,
@@ -206,6 +236,9 @@ class _OpenStreetMapSearchAndPickModularState
                             allowedCountryName: widget.allowedCountryName,
                             wrongCountryMessage: widget.wrongCountryMessage,
                             autovalidateMode: widget.autovalidateMode,
+                            hintTextColor: widget.searchHintTextColor,
+                            onAddressSelected: widget.onAddressSelected,
+                            onLocationChanged: widget.onLocationChanged,
                           ),
                         ),
                       ),
@@ -247,7 +280,13 @@ class _OpenStreetMapSearchAndPickModularState
                           child: OSMSearchField(
                             controller: _osmController,
                             hintText: widget.hintText,
-                            borderColor: widget.buttonColor,
+                            borderColor: widget.searchBorderColor,
+                            borderWidth: widget.searchBorderWidth,
+                            borderRadius: widget.searchBorderRadius,
+                            textStyle: widget.searchTextStyle,
+                            decoration: widget.searchDecoration,
+                            margin: widget.searchMargin,
+                            padding: widget.searchPadding,
                             backgroundColor: widget.searchFieldBackgroundColor,
                             prefixIcon: widget.searchFieldPrefixIcon,
                             requiredField: widget.requiredField,
@@ -256,6 +295,9 @@ class _OpenStreetMapSearchAndPickModularState
                             allowedCountryName: widget.allowedCountryName,
                             wrongCountryMessage: widget.wrongCountryMessage,
                             autovalidateMode: widget.autovalidateMode,
+                            hintTextColor: widget.searchHintTextColor,
+                            onAddressSelected: widget.onAddressSelected,
+                            onLocationChanged: widget.onLocationChanged,
                           ),
                         ),
                       ),
@@ -279,6 +321,8 @@ class _OpenStreetMapSearchAndPickModularState
                         buttonColor: widget.buttonColor,
                         buttonTextColor: widget.buttonTextColor,
                         onCurrentLocationPressed: _onCurrentLocationPressed,
+                        onLocationChanged: widget.onLocationChanged,
+                        onAddressSelected: widget.onAddressSelected,
                       ),
                     ),
                     if (widget.showPickButton)

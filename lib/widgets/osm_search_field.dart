@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:latlong2/latlong.dart';
 import '../controllers/osm_controller.dart';
 
 /// Widget de champ de recherche indépendant pour OpenStreetMap
@@ -25,6 +26,9 @@ class OSMSearchField extends StatelessWidget {
   final String wrongCountryMessage; // message si pas dans le bon pays
   final AutovalidateMode autovalidateMode;
   final FormFieldValidator<String>? validator;
+  final Color? hintTextColor;
+  final void Function(OSMdata address)? onAddressSelected;
+  final void Function(LatLng center, Map<String, dynamic>? address)? onLocationChanged;
 
   const OSMSearchField({
     Key? key,
@@ -50,6 +54,9 @@ class OSMSearchField extends StatelessWidget {
     this.wrongCountryMessage = "L'adresse n'est pas dans le pays requis",
     this.autovalidateMode = AutovalidateMode.onUserInteraction,
     this.validator,
+    this.hintTextColor,
+    this.onAddressSelected,
+    this.onLocationChanged,
   }) : super(key: key);
 
   @override
@@ -69,6 +76,7 @@ class OSMSearchField extends StatelessWidget {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
+              _OSMFieldListeners(controller: controller, onLocationChanged: onLocationChanged),
               _buildSearchField(),
               if (showSuggestions) _buildSuggestionsList(),
             ],
@@ -121,6 +129,7 @@ class OSMSearchField extends StatelessWidget {
           decoration: decoration ??
               InputDecoration(
                 hintText: hintText,
+                hintStyle: hintTextColor != null ? TextStyle(color: hintTextColor) : null,
                 border: inputBorder,
                 focusedBorder: inputFocusBorder,
                 enabledBorder: inputBorder,
@@ -196,9 +205,54 @@ class OSMSearchField extends StatelessWidget {
         '${suggestion.lat.toStringAsFixed(4)}, ${suggestion.lon.toStringAsFixed(4)}',
         style: TextStyle(fontSize: 12, color: Colors.grey[600]),
       ),
-      onTap: () => controller.selectLocation(suggestion),
+      onTap: () {
+        controller.selectLocation(suggestion);
+        if (onAddressSelected != null) {
+          onAddressSelected!(suggestion);
+        }
+      },
     );
   }
+}
+
+/// Petit widget interne pour relayer les changements de position du contrôleur
+class _OSMFieldListeners extends StatefulWidget {
+  final OSMController controller;
+  final void Function(LatLng center, Map<String, dynamic>? address)? onLocationChanged;
+  const _OSMFieldListeners({Key? key, required this.controller, this.onLocationChanged}) : super(key: key);
+
+  @override
+  State<_OSMFieldListeners> createState() => _OSMFieldListenersState();
+}
+
+class _OSMFieldListenersState extends State<_OSMFieldListeners> {
+  void _handler(LatLng c, Map<String, dynamic>? a) {
+    widget.onLocationChanged?.call(c, a);
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    widget.controller.addLocationChangedListener(_handler);
+  }
+
+  @override
+  void didUpdateWidget(covariant _OSMFieldListeners oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.controller != widget.controller) {
+      oldWidget.controller.removeLocationChangedListener(_handler);
+      widget.controller.addLocationChangedListener(_handler);
+    }
+  }
+
+  @override
+  void dispose() {
+    widget.controller.removeLocationChangedListener(_handler);
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) => const SizedBox.shrink();
 }
 
 /// Version compacte du champ de recherche sans suggestions

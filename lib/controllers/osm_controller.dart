@@ -30,6 +30,11 @@ class OSMController extends ChangeNotifier {
   Map<String, dynamic>? _lastAddress;
   String? _lastCountryCode;
   String? _lastCountryName;
+  LatLng? _lastCenter;
+
+  // Listeners
+  final List<void Function(LatLng center, Map<String, dynamic>? address)> _locationChangedListeners = [];
+  final List<void Function(OSMdata location)> _addressSelectedListeners = [];
   
   // Getters
   MapController get mapController => _mapController;
@@ -44,10 +49,28 @@ class OSMController extends ChangeNotifier {
   String? get email => _email;
   Duration get minReverseInterval => _minReverseInterval;
   double get minReverseMoveMeters => _minReverseMoveMeters;
+  LatLng? get lastCenter => _lastCenter;
   
   // Setters
   set baseUri(String uri) {
     _baseUri = uri;
+  }
+
+  // API listeners
+  void addLocationChangedListener(void Function(LatLng center, Map<String, dynamic>? address) listener) {
+    _locationChangedListeners.add(listener);
+  }
+
+  void removeLocationChangedListener(void Function(LatLng center, Map<String, dynamic>? address) listener) {
+    _locationChangedListeners.remove(listener);
+  }
+
+  void addAddressSelectedListener(void Function(OSMdata location) listener) {
+    _addressSelectedListeners.add(listener);
+  }
+
+  void removeAddressSelectedListener(void Function(OSMdata location) listener) {
+    _addressSelectedListeners.remove(listener);
   }
   set userAgent(String? ua) => _userAgent = ua;
   set email(String? em) => _email = em;
@@ -101,6 +124,7 @@ class OSMController extends ChangeNotifier {
 
       _lastReverseAt = now;
       _lastReverseLatLng = current;
+      _lastCenter = current;
 
       String url = '$_baseUri/reverse?format=json&lat=$latitude&lon=$longitude&zoom=18&addressdetails=1';
       if (_email != null && _email!.isNotEmpty) {
@@ -125,6 +149,10 @@ class OSMController extends ChangeNotifier {
       _lastCountryCode = address != null ? (address['country_code'] as String?)?.toUpperCase() : null;
       _lastCountryName = address != null ? address['country'] as String? : null;
       notifyListeners();
+      // Notifier listeners de changement de position
+      for (final l in _locationChangedListeners) {
+        try { l(current, address); } catch (_) {}
+      }
     } catch (e) {
       if (kDebugMode) {
         print('Erreur lors de la récupération de l\'adresse: $e');
@@ -185,6 +213,10 @@ class OSMController extends ChangeNotifier {
     // Déclencher un reverse geocoding pour mettre à jour lastAddress/pays
     _updateSearchTextFromCoordinates(location.lat, location.lon, force: true);
     notifyListeners();
+    // Notifier écouteurs d'adresse choisie
+    for (final l in _addressSelectedListeners) {
+      try { l(location); } catch (_) {}
+    }
   }
   
   /// Déplace la carte vers une position spécifique
