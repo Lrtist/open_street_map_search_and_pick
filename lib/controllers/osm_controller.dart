@@ -17,6 +17,15 @@ class OSMController extends ChangeNotifier {
   final http.Client _client = http.Client();
   String _baseUri = 'https://nominatim.openstreetmap.org';
   
+  // Nominatim usage policy
+  String? _userAgent; // Recommandé: NomApp/Version (contact@email)
+  String? _email; // recommandé par Nominatim
+  Duration _minReverseInterval = const Duration(milliseconds: 1500);
+  double _minReverseMoveMeters = 25.0;
+  DateTime? _lastReverseAt;
+  LatLng? _lastReverseLatLng;
+  bool _mapListenerAttached = false;
+  
   // Dernières informations obtenues par reverse geocoding
   Map<String, dynamic>? _lastAddress;
   String? _lastCountryCode;
@@ -31,20 +40,32 @@ class OSMController extends ChangeNotifier {
   Map<String, dynamic>? get lastAddress => _lastAddress;
   String? get lastCountryCode => _lastCountryCode;
   String? get lastCountryName => _lastCountryName;
+  String? get userAgent => _userAgent;
+  String? get email => _email;
+  Duration get minReverseInterval => _minReverseInterval;
+  double get minReverseMoveMeters => _minReverseMoveMeters;
   
   // Setters
   set baseUri(String uri) {
     _baseUri = uri;
   }
+  set userAgent(String? ua) => _userAgent = ua;
+  set email(String? em) => _email = em;
+  set minReverseInterval(Duration d) => _minReverseInterval = d;
+  set minReverseMoveMeters(double m) => _minReverseMoveMeters = m;
   
   /// Initialise le contrôleur avec une position initiale
   void initialize({LatLng? initialPosition}) {
     if (initialPosition != null) {
       _mapController.move(initialPosition, 15.0);
-      _updateSearchTextFromCoordinates(initialPosition.latitude, initialPosition.longitude);
+      _updateSearchTextFromCoordinates(initialPosition.latitude, initialPosition.longitude, force: true);
     }
-    
-    // Écouter les mouvements de la carte
+    _attachMapMoveListener();
+  }
+
+  void _attachMapMoveListener() {
+    if (_mapListenerAttached) return;
+    _mapListenerAttached = true;
     _mapController.mapEventStream.listen((event) async {
       if (event is MapEventMoveEnd) {
         await _updateSearchTextFromCoordinates(
@@ -56,10 +77,40 @@ class OSMController extends ChangeNotifier {
   }
   
   /// Met à jour le texte de recherche basé sur les coordonnées
-  Future<void> _updateSearchTextFromCoordinates(double latitude, double longitude) async {
+  Future<void> _updateSearchTextFromCoordinates(double latitude, double longitude, {bool force = false}) async {
     try {
+      // Throttle + distance filter
+      final now = DateTime.now();
+      final current = LatLng(latitude, longitude);
+      if (!force) {
+        if (_lastReverseAt != null && now.difference(_lastReverseAt!) < _minReverseInterval) {
+          return; // trop fréquent
+        }
+        if (_lastReverseLatLng != null) {
+          final dist = const Distance().as(LengthUnit.Meter, _lastReverseLatLng!, current);
+          if (dist < _minReverseMoveMeters) {
+            return; // mouvement trop petit
+          }
+        }
+      }
+
+      _lastReverseAt = now;
+      _lastReverseLatLng = current;
+
       String url = '$_baseUri/reverse?format=json&lat=$latitude&lon=$longitude&zoom=18&addressdetails=1';
-      var response = await _client.get(Uri.parse(url));
+      if (_email != null && _email!.isNotEmpty) {
+        url = '$url&email=${Uri.encodeComponent(_email!)}';
+      }
+      var response = await _client.get(
+        Uri.parse(url),
+        headers: _buildHeaders(),
+      );
+
+      if (response.statusCode == 429) {
+        // Simple backoff
+        await Future.delayed(const Duration(seconds: 2));
+        response = await _client.get(Uri.parse(url), headers: _buildHeaders());
+      }
       var decodedResponse = jsonDecode(utf8.decode(response.bodyBytes)) as Map<dynamic, dynamic>;
       
       _searchController.text = decodedResponse['display_name'] ?? "Position actuelle";
@@ -90,8 +141,15 @@ class OSMController extends ChangeNotifier {
     
     _debounce = Timer(const Duration(milliseconds: 1000), () async {
       try {
-        String url = '$_baseUri/search?q=$query&format=json&polygon_geojson=1&addressdetails=1';
-        var response = await _client.get(Uri.parse(url));
+        String url = '$_baseUri/search?q=$query&format=json&polygon_geojson=1&addressdetails=1&limit=10';
+        if (_email != null && _email!.isNotEmpty) {
+          url = '$url&email=${Uri.encodeComponent(_email!)}';
+        }
+        var response = await _client.get(Uri.parse(url), headers: _buildHeaders());
+        if (response.statusCode == 429) {
+          await Future.delayed(const Duration(seconds: 2));
+          response = await _client.get(Uri.parse(url), headers: _buildHeaders());
+        }
         var decodedResponse = jsonDecode(utf8.decode(response.bodyBytes)) as List<dynamic>;
         
         _searchOptions = decodedResponse
@@ -120,7 +178,7 @@ class OSMController extends ChangeNotifier {
     _focusNode.unfocus();
     _searchOptions.clear();
     // Déclencher un reverse geocoding pour mettre à jour lastAddress/pays
-    _updateSearchTextFromCoordinates(location.lat, location.lon);
+    _updateSearchTextFromCoordinates(location.lat, location.lon, force: true);
     notifyListeners();
   }
   
@@ -145,7 +203,14 @@ class OSMController extends ChangeNotifier {
     
     try {
       String url = '$_baseUri/reverse?format=json&lat=${_mapController.center.latitude}&lon=${_mapController.center.longitude}&zoom=18&addressdetails=1';
-      var response = await _client.get(Uri.parse(url));
+      if (_email != null && _email!.isNotEmpty) {
+        url = '$url&email=${Uri.encodeComponent(_email!)}';
+      }
+      var response = await _client.get(Uri.parse(url), headers: _buildHeaders());
+      if (response.statusCode == 429) {
+        await Future.delayed(const Duration(seconds: 2));
+        response = await _client.get(Uri.parse(url), headers: _buildHeaders());
+      }
       var decodedResponse = jsonDecode(utf8.decode(response.bodyBytes)) as Map<dynamic, dynamic>;
       
       String displayName = decodedResponse['display_name'] ?? 'Position inconnue';
@@ -173,6 +238,18 @@ class OSMController extends ChangeNotifier {
     _focusNode.dispose();
     _client.close();
     super.dispose();
+  }
+}
+
+Map<String, String> _defaultHeaders(String? userAgent) {
+  return {
+    if (userAgent != null && userAgent.isNotEmpty) 'User-Agent': userAgent,
+  };
+}
+
+extension on OSMController {
+  Map<String, String> _buildHeaders() {
+    return _defaultHeaders(_userAgent);
   }
 }
 
