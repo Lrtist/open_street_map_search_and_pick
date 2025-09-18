@@ -64,6 +64,8 @@ class OSMMapView extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // S'assurer que les mouvements de la carte mettront à jour l'adresse
+    controller.ensureMapListener();
     return Container(
       width: width,
       height: height,

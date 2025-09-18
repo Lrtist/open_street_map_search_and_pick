@@ -6,6 +6,9 @@ import 'osm_search_field.dart';
 import 'osm_map_view.dart';
 import 'wide_button.dart';
 
+/// Emplacement du champ de recherche
+enum SearchFieldPlacement { overlay, top }
+
 /// Version modulaire du widget OpenStreetMapSearchAndPick
 /// Utilise les nouveaux composants séparés pour plus de flexibilité
 class OpenStreetMapSearchAndPickModular extends StatefulWidget {
@@ -39,6 +42,9 @@ class OpenStreetMapSearchAndPickModular extends StatefulWidget {
   final String? allowedCountryName;
   final String wrongCountryMessage;
   final AutovalidateMode autovalidateMode;
+  // Placement du champ
+  final SearchFieldPlacement searchFieldPlacement;
+  final double topSpacing;
 
   const OpenStreetMapSearchAndPickModular({
     Key? key,
@@ -72,6 +78,8 @@ class OpenStreetMapSearchAndPickModular extends StatefulWidget {
     this.allowedCountryName,
     this.wrongCountryMessage = "L'adresse n'est pas dans le pays requis",
     this.autovalidateMode = AutovalidateMode.onUserInteraction,
+    this.searchFieldPlacement = SearchFieldPlacement.overlay,
+    this.topSpacing = 12.0,
   }) : super(key: key);
 
   @override
@@ -155,82 +163,144 @@ class _OpenStreetMapSearchAndPickModularState
         });
 
         return SafeArea(
-          child: Stack(
-            children: [
-              // Carte
-              Positioned.fill(
-                child: OSMMapView(
-                  controller: _osmController,
-                  initialCenter: initialCenter,
-                  showZoomControls: widget.showMapControls,
-                  showCurrentLocationButton: widget.showMapControls,
-                  showLocationPin: widget.showLocationPin,
-                  locationPinText: widget.locationPinText,
-                  locationPinTextStyle: widget.locationPinTextStyle,
-                  locationPinIcon: widget.locationPinIcon,
-                  locationPinIconColor: widget.locationPinIconColor,
-                  zoomInIcon: widget.zoomInIcon,
-                  zoomOutIcon: widget.zoomOutIcon,
-                  currentLocationIcon: widget.currentLocationIcon,
-                  buttonColor: widget.buttonColor,
-                  buttonTextColor: widget.buttonTextColor,
-                  onCurrentLocationPressed: _onCurrentLocationPressed,
-                ),
-              ),
-              
-              // Champ de recherche
-              if (widget.showSearchField)
-                Positioned(
-                  top: 0,
-                  left: 0,
-                  right: 0,
-                  child: Form(
-                    key: _formKey,
-                    child: OSMSearchField(
-                      controller: _osmController,
-                      hintText: widget.hintText,
-                      borderColor: widget.buttonColor,
-                      backgroundColor: widget.searchFieldBackgroundColor,
-                      prefixIcon: widget.searchFieldPrefixIcon,
-                      requiredField: widget.requiredField,
-                      requiredMessage: widget.requiredMessage,
-                      allowedCountryCode: widget.allowedCountryCode,
-                      allowedCountryName: widget.allowedCountryName,
-                      wrongCountryMessage: widget.wrongCountryMessage,
-                      autovalidateMode: widget.autovalidateMode,
-                    ),
-                  ),
-                ),
-              
-              // Bouton de sélection
-              if (widget.showPickButton)
-                Positioned(
-                  bottom: 0,
-                  left: 0,
-                  right: 0,
-                  child: Center(
-                    child: Padding(
-                      padding: const EdgeInsets.all(8.0),
-                      child: WideButton(
-                        widget.buttonText,
-                        textStyle: widget.buttonTextStyle,
-                        height: widget.buttonHeight,
-                        width: widget.buttonWidth,
-                        onPressed: () async {
-                          // Valider d'abord si un champ de recherche est affiché
-                          if (!widget.showSearchField || _formKey.currentState?.validate() == true) {
-                            final pickedData = await _osmController.getCurrentPickedData();
-                            widget.onPicked(pickedData);
-                          }
-                        },
-                        backgroundColor: widget.buttonColor,
-                        foregroundColor: widget.buttonTextColor,
+          child: widget.searchFieldPlacement == SearchFieldPlacement.overlay
+              ? Stack(
+                  children: [
+                    // Carte
+                    Positioned.fill(
+                      child: OSMMapView(
+                        controller: _osmController,
+                        initialCenter: initialCenter,
+                        showZoomControls: widget.showMapControls,
+                        showCurrentLocationButton: widget.showMapControls,
+                        showLocationPin: widget.showLocationPin,
+                        locationPinText: widget.locationPinText,
+                        locationPinTextStyle: widget.locationPinTextStyle,
+                        locationPinIcon: widget.locationPinIcon,
+                        locationPinIconColor: widget.locationPinIconColor,
+                        zoomInIcon: widget.zoomInIcon,
+                        zoomOutIcon: widget.zoomOutIcon,
+                        currentLocationIcon: widget.currentLocationIcon,
+                        buttonColor: widget.buttonColor,
+                        buttonTextColor: widget.buttonTextColor,
+                        onCurrentLocationPressed: _onCurrentLocationPressed,
                       ),
                     ),
-                  ),
+                    // Champ en overlay
+                    if (widget.showSearchField)
+                      Positioned(
+                        top: 0,
+                        left: 0,
+                        right: 0,
+                        child: Form(
+                          key: _formKey,
+                          child: OSMSearchField(
+                            controller: _osmController,
+                            hintText: widget.hintText,
+                            borderColor: widget.buttonColor,
+                            backgroundColor: widget.searchFieldBackgroundColor,
+                            prefixIcon: widget.searchFieldPrefixIcon,
+                            requiredField: widget.requiredField,
+                            requiredMessage: widget.requiredMessage,
+                            allowedCountryCode: widget.allowedCountryCode,
+                            allowedCountryName: widget.allowedCountryName,
+                            wrongCountryMessage: widget.wrongCountryMessage,
+                            autovalidateMode: widget.autovalidateMode,
+                          ),
+                        ),
+                      ),
+                    // Bouton de sélection
+                    if (widget.showPickButton)
+                      Positioned(
+                        bottom: 0,
+                        left: 0,
+                        right: 0,
+                        child: Center(
+                          child: Padding(
+                            padding: const EdgeInsets.all(8.0),
+                            child: WideButton(
+                              widget.buttonText,
+                              textStyle: widget.buttonTextStyle,
+                              height: widget.buttonHeight,
+                              width: widget.buttonWidth,
+                              onPressed: () async {
+                                if (!widget.showSearchField || _formKey.currentState?.validate() == true) {
+                                  final pickedData = await _osmController.getCurrentPickedData();
+                                  widget.onPicked(pickedData);
+                                }
+                              },
+                              backgroundColor: widget.buttonColor,
+                              foregroundColor: widget.buttonTextColor,
+                            ),
+                          ),
+                        ),
+                      ),
+                  ],
+                )
+              : Column(
+                  children: [
+                    if (widget.showSearchField) ...[
+                      Padding(
+                        padding: EdgeInsets.only(top: widget.topSpacing, left: 12, right: 12),
+                        child: Form(
+                          key: _formKey,
+                          child: OSMSearchField(
+                            controller: _osmController,
+                            hintText: widget.hintText,
+                            borderColor: widget.buttonColor,
+                            backgroundColor: widget.searchFieldBackgroundColor,
+                            prefixIcon: widget.searchFieldPrefixIcon,
+                            requiredField: widget.requiredField,
+                            requiredMessage: widget.requiredMessage,
+                            allowedCountryCode: widget.allowedCountryCode,
+                            allowedCountryName: widget.allowedCountryName,
+                            wrongCountryMessage: widget.wrongCountryMessage,
+                            autovalidateMode: widget.autovalidateMode,
+                          ),
+                        ),
+                      ),
+                      SizedBox(height: widget.topSpacing),
+                    ],
+                    // Carte
+                    Expanded(
+                      child: OSMMapView(
+                        controller: _osmController,
+                        initialCenter: initialCenter,
+                        showZoomControls: widget.showMapControls,
+                        showCurrentLocationButton: widget.showMapControls,
+                        showLocationPin: widget.showLocationPin,
+                        locationPinText: widget.locationPinText,
+                        locationPinTextStyle: widget.locationPinTextStyle,
+                        locationPinIcon: widget.locationPinIcon,
+                        locationPinIconColor: widget.locationPinIconColor,
+                        zoomInIcon: widget.zoomInIcon,
+                        zoomOutIcon: widget.zoomOutIcon,
+                        currentLocationIcon: widget.currentLocationIcon,
+                        buttonColor: widget.buttonColor,
+                        buttonTextColor: widget.buttonTextColor,
+                        onCurrentLocationPressed: _onCurrentLocationPressed,
+                      ),
+                    ),
+                    if (widget.showPickButton)
+                      Padding(
+                        padding: const EdgeInsets.all(8.0),
+                        child: WideButton(
+                          widget.buttonText,
+                          textStyle: widget.buttonTextStyle,
+                          height: widget.buttonHeight,
+                          width: widget.buttonWidth,
+                          onPressed: () async {
+                            if (!widget.showSearchField || _formKey.currentState?.validate() == true) {
+                              final pickedData = await _osmController.getCurrentPickedData();
+                              widget.onPicked(pickedData);
+                            }
+                          },
+                          backgroundColor: widget.buttonColor,
+                          foregroundColor: widget.buttonTextColor,
+                        ),
+                      ),
+                  ],
                 ),
-            ],
-          ),
         );
       },
     );

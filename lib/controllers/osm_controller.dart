@@ -75,6 +75,11 @@ class OSMController extends ChangeNotifier {
       }
     });
   }
+
+  /// Rendre public l'attachement du listener carte, idempotent
+  void ensureMapListener() {
+    _attachMapMoveListener();
+  }
   
   /// Met à jour le texte de recherche basé sur les coordonnées
   Future<void> _updateSearchTextFromCoordinates(double latitude, double longitude, {bool force = false}) async {
