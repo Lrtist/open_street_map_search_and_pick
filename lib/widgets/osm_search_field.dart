@@ -16,6 +16,15 @@ class OSMSearchField extends StatelessWidget {
   final Widget Function(BuildContext context, OSMdata suggestion, VoidCallback onTap)? suggestionBuilder;
   final bool showSuggestions;
   final double? maxHeight;
+  final Color backgroundColor;
+  final IconData prefixIcon;
+  final bool requiredField;
+  final String requiredMessage;
+  final String? allowedCountryCode; // ex: 'FR'
+  final String? allowedCountryName; // ex: 'France' (fallback si code non fourni)
+  final String wrongCountryMessage; // message si pas dans le bon pays
+  final AutovalidateMode autovalidateMode;
+  final FormFieldValidator<String>? validator;
 
   const OSMSearchField({
     Key? key,
@@ -32,6 +41,15 @@ class OSMSearchField extends StatelessWidget {
     this.suggestionBuilder,
     this.showSuggestions = true,
     this.maxHeight,
+    this.backgroundColor = Colors.white,
+    this.prefixIcon = Icons.gps_fixed,
+    this.requiredField = false,
+    this.requiredMessage = 'Ce champ est requis',
+    this.allowedCountryCode,
+    this.allowedCountryName,
+    this.wrongCountryMessage = "L'adresse n'est pas dans le pays requis",
+    this.autovalidateMode = AutovalidateMode.onUserInteraction,
+    this.validator,
   }) : super(key: key);
 
   @override
@@ -40,11 +58,11 @@ class OSMSearchField extends StatelessWidget {
       margin: margin ?? const EdgeInsets.all(15),
       constraints: maxHeight != null ? BoxConstraints(maxHeight: maxHeight!) : null,
       child: Material(
-        elevation: 4,
+        elevation: 0,
         borderRadius: borderRadius ?? BorderRadius.circular(8),
         child: Container(
           decoration: BoxDecoration(
-            color: Colors.white,
+            color: backgroundColor,
             borderRadius: borderRadius ?? BorderRadius.circular(8),
           ),
           padding: padding ?? const EdgeInsets.all(8),
@@ -71,34 +89,61 @@ class OSMSearchField extends StatelessWidget {
       borderRadius: borderRadius ?? BorderRadius.circular(8),
     );
 
-    return TextFormField(
-      controller: controller.searchController,
-      focusNode: controller.focusNode,
-      style: textStyle,
-      decoration: decoration ??
-          InputDecoration(
-            hintText: hintText,
-            border: inputBorder,
-            focusedBorder: inputFocusBorder,
-            enabledBorder: inputBorder,
-            prefixIcon: Icon(Icons.search, color: borderColor),
-            suffixIcon: AnimatedBuilder(
-              animation: controller.searchController,
-              builder: (context, child) {
-                return controller.searchController.text.isNotEmpty
-                    ? IconButton(
-                        icon: Icon(Icons.clear, color: borderColor),
-                        onPressed: () {
-                          controller.searchController.clear();
-                          controller.searchLocation('');
-                        },
-                      )
-                    : const SizedBox.shrink();
-              },
-            ),
-          ),
-      onChanged: (value) {
-        controller.searchLocation(value);
+    // AnimatedBuilder pour rafraîchir la validation lorsque la carte bouge
+    return AnimatedBuilder(
+      animation: controller,
+      builder: (context, _) {
+        return TextFormField(
+          controller: controller.searchController,
+          focusNode: controller.focusNode,
+          style: textStyle,
+          autovalidateMode: autovalidateMode,
+          validator: validator ?? (value) {
+            final text = value?.trim() ?? '';
+            if (requiredField && text.isEmpty) {
+              return requiredMessage;
+            }
+            // Validation du pays si demandé
+            final cc = controller.lastCountryCode;
+            final cn = controller.lastCountryName;
+            if (allowedCountryCode != null && (cc == null || cc.toUpperCase() != allowedCountryCode!.toUpperCase())) {
+              // Si un nom est fourni, le montrer dans le message
+              final expected = allowedCountryName ?? allowedCountryCode;
+              return "$wrongCountryMessage (${expected})";
+            }
+            if (allowedCountryCode == null && allowedCountryName != null) {
+              if (cn == null || cn.toLowerCase() != allowedCountryName!.toLowerCase()) {
+                return "$wrongCountryMessage (${allowedCountryName})";
+              }
+            }
+            return null;
+          },
+          decoration: decoration ??
+              InputDecoration(
+                hintText: hintText,
+                border: inputBorder,
+                focusedBorder: inputFocusBorder,
+                enabledBorder: inputBorder,
+                prefixIcon: Icon(prefixIcon, color: borderColor),
+                suffixIcon: AnimatedBuilder(
+                  animation: controller.searchController,
+                  builder: (context, child) {
+                    return controller.searchController.text.isNotEmpty
+                        ? IconButton(
+                            icon: Icon(Icons.clear, color: borderColor),
+                            onPressed: () {
+                              controller.searchController.clear();
+                              controller.searchLocation('');
+                            },
+                          )
+                        : const SizedBox.shrink();
+                  },
+                ),
+              ),
+          onChanged: (value) {
+            controller.searchLocation(value);
+          },
+        );
       },
     );
   }
@@ -165,6 +210,15 @@ class OSMSearchFieldCompact extends StatelessWidget {
   final Color borderColor;
   final VoidCallback? onTap;
   final bool readOnly;
+  final Color backgroundColor;
+  final IconData prefixIcon;
+  final bool requiredField;
+  final String requiredMessage;
+  final String? allowedCountryCode;
+  final String? allowedCountryName;
+  final String wrongCountryMessage;
+  final AutovalidateMode autovalidateMode;
+  final FormFieldValidator<String>? validator;
 
   const OSMSearchFieldCompact({
     Key? key,
@@ -175,30 +229,65 @@ class OSMSearchFieldCompact extends StatelessWidget {
     this.borderColor = Colors.blue,
     this.onTap,
     this.readOnly = false,
+    this.backgroundColor = Colors.white,
+    this.prefixIcon = Icons.gps_fixed,
+    this.requiredField = false,
+    this.requiredMessage = 'Ce champ est requis',
+    this.allowedCountryCode,
+    this.allowedCountryName,
+    this.wrongCountryMessage = "L'adresse n'est pas dans le pays requis",
+    this.autovalidateMode = AutovalidateMode.onUserInteraction,
+    this.validator,
   }) : super(key: key);
 
   @override
   Widget build(BuildContext context) {
-    return TextFormField(
-      controller: controller.searchController,
-      focusNode: controller.focusNode,
-      style: textStyle,
-      readOnly: readOnly,
-      onTap: onTap,
-      decoration: decoration ??
-          InputDecoration(
-            hintText: hintText,
-            border: OutlineInputBorder(
-              borderSide: BorderSide(color: borderColor),
-              borderRadius: BorderRadius.circular(8),
-            ),
-            focusedBorder: OutlineInputBorder(
-              borderSide: BorderSide(color: borderColor, width: 2),
-              borderRadius: BorderRadius.circular(8),
-            ),
-            prefixIcon: Icon(Icons.search, color: borderColor),
-          ),
-      onChanged: readOnly ? null : (value) => controller.searchLocation(value),
+    return AnimatedBuilder(
+      animation: controller,
+      builder: (context, _) {
+        return TextFormField(
+          controller: controller.searchController,
+          focusNode: controller.focusNode,
+          style: textStyle,
+          readOnly: readOnly,
+          onTap: onTap,
+          autovalidateMode: autovalidateMode,
+          validator: validator ?? (value) {
+            final text = value?.trim() ?? '';
+            if (requiredField && text.isEmpty) {
+              return requiredMessage;
+            }
+            final cc = controller.lastCountryCode;
+            final cn = controller.lastCountryName;
+            if (allowedCountryCode != null && (cc == null || cc.toUpperCase() != allowedCountryCode!.toUpperCase())) {
+              final expected = allowedCountryName ?? allowedCountryCode;
+              return "$wrongCountryMessage (${expected})";
+            }
+            if (allowedCountryCode == null && allowedCountryName != null) {
+              if (cn == null || cn.toLowerCase() != allowedCountryName!.toLowerCase()) {
+                return "$wrongCountryMessage (${allowedCountryName})";
+              }
+            }
+            return null;
+          },
+          decoration: decoration ??
+              InputDecoration(
+                fillColor: backgroundColor,
+                filled: true,
+                hintText: hintText,
+                border: OutlineInputBorder(
+                  borderSide: BorderSide(color: borderColor),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                focusedBorder: OutlineInputBorder(
+                  borderSide: BorderSide(color: borderColor, width: 2),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                prefixIcon: Icon(prefixIcon, color: borderColor),
+              ),
+          onChanged: readOnly ? null : (value) => controller.searchLocation(value),
+        );
+      },
     );
   }
 }

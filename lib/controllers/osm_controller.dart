@@ -17,12 +17,20 @@ class OSMController extends ChangeNotifier {
   final http.Client _client = http.Client();
   String _baseUri = 'https://nominatim.openstreetmap.org';
   
+  // Dernières informations obtenues par reverse geocoding
+  Map<String, dynamic>? _lastAddress;
+  String? _lastCountryCode;
+  String? _lastCountryName;
+  
   // Getters
   MapController get mapController => _mapController;
   TextEditingController get searchController => _searchController;
   FocusNode get focusNode => _focusNode;
   List<OSMdata> get searchOptions => _searchOptions;
   String get baseUri => _baseUri;
+  Map<String, dynamic>? get lastAddress => _lastAddress;
+  String? get lastCountryCode => _lastCountryCode;
+  String? get lastCountryName => _lastCountryName;
   
   // Setters
   set baseUri(String uri) {
@@ -55,6 +63,11 @@ class OSMController extends ChangeNotifier {
       var decodedResponse = jsonDecode(utf8.decode(response.bodyBytes)) as Map<dynamic, dynamic>;
       
       _searchController.text = decodedResponse['display_name'] ?? "Position actuelle";
+      // Stocker les infos d'adresse et pays
+      final address = (decodedResponse['address'] as Map?)?.cast<String, dynamic>();
+      _lastAddress = address;
+      _lastCountryCode = address != null ? (address['country_code'] as String?)?.toUpperCase() : null;
+      _lastCountryName = address != null ? address['country'] as String? : null;
       notifyListeners();
     } catch (e) {
       if (kDebugMode) {
@@ -106,6 +119,8 @@ class OSMController extends ChangeNotifier {
     _searchController.text = location.displayname;
     _focusNode.unfocus();
     _searchOptions.clear();
+    // Déclencher un reverse geocoding pour mettre à jour lastAddress/pays
+    _updateSearchTextFromCoordinates(location.lat, location.lon);
     notifyListeners();
   }
   
@@ -134,7 +149,11 @@ class OSMController extends ChangeNotifier {
       var decodedResponse = jsonDecode(utf8.decode(response.bodyBytes)) as Map<dynamic, dynamic>;
       
       String displayName = decodedResponse['display_name'] ?? 'Position inconnue';
-      Map<String, dynamic> address = decodedResponse['address'] ?? {};
+      Map<String, dynamic> address = (decodedResponse['address'] as Map?)?.cast<String, dynamic>() ?? {};
+      // Mettre à jour le cache
+      _lastAddress = address;
+      _lastCountryCode = (address['country_code'] as String?)?.toUpperCase();
+      _lastCountryName = address['country'] as String?;
       
       return PickedData(center, displayName, address);
     } catch (e) {

@@ -29,6 +29,16 @@ class OpenStreetMapSearchAndPickModular extends StatefulWidget {
   final bool showMapControls;
   final bool showLocationPin;
   final bool showPickButton;
+  // Options du champ de recherche
+  final Color searchFieldBackgroundColor;
+  final IconData searchFieldPrefixIcon;
+  // Validation
+  final bool requiredField;
+  final String requiredMessage;
+  final String? allowedCountryCode;
+  final String? allowedCountryName;
+  final String wrongCountryMessage;
+  final AutovalidateMode autovalidateMode;
 
   const OpenStreetMapSearchAndPickModular({
     Key? key,
@@ -54,6 +64,14 @@ class OpenStreetMapSearchAndPickModular extends StatefulWidget {
     this.showMapControls = true,
     this.showLocationPin = true,
     this.showPickButton = true,
+    this.searchFieldBackgroundColor = Colors.white,
+    this.searchFieldPrefixIcon = Icons.gps_fixed,
+    this.requiredField = false,
+    this.requiredMessage = 'Ce champ est requis',
+    this.allowedCountryCode,
+    this.allowedCountryName,
+    this.wrongCountryMessage = "L'adresse n'est pas dans le pays requis",
+    this.autovalidateMode = AutovalidateMode.onUserInteraction,
   }) : super(key: key);
 
   @override
@@ -65,6 +83,7 @@ class _OpenStreetMapSearchAndPickModularState
     extends State<OpenStreetMapSearchAndPickModular> {
   late OSMController _osmController;
   late Future<Position?> _locationFuture;
+  final _formKey = GlobalKey<FormState>();
 
   @override
   void initState() {
@@ -165,10 +184,21 @@ class _OpenStreetMapSearchAndPickModularState
                   top: 0,
                   left: 0,
                   right: 0,
-                  child: OSMSearchField(
-                    controller: _osmController,
-                    hintText: widget.hintText,
-                    borderColor: widget.buttonColor,
+                  child: Form(
+                    key: _formKey,
+                    child: OSMSearchField(
+                      controller: _osmController,
+                      hintText: widget.hintText,
+                      borderColor: widget.buttonColor,
+                      backgroundColor: widget.searchFieldBackgroundColor,
+                      prefixIcon: widget.searchFieldPrefixIcon,
+                      requiredField: widget.requiredField,
+                      requiredMessage: widget.requiredMessage,
+                      allowedCountryCode: widget.allowedCountryCode,
+                      allowedCountryName: widget.allowedCountryName,
+                      wrongCountryMessage: widget.wrongCountryMessage,
+                      autovalidateMode: widget.autovalidateMode,
+                    ),
                   ),
                 ),
               
@@ -187,8 +217,11 @@ class _OpenStreetMapSearchAndPickModularState
                         height: widget.buttonHeight,
                         width: widget.buttonWidth,
                         onPressed: () async {
-                          final pickedData = await _osmController.getCurrentPickedData();
-                          widget.onPicked(pickedData);
+                          // Valider d'abord si un champ de recherche est affiché
+                          if (!widget.showSearchField || _formKey.currentState?.validate() == true) {
+                            final pickedData = await _osmController.getCurrentPickedData();
+                            widget.onPicked(pickedData);
+                          }
                         },
                         backgroundColor: widget.buttonColor,
                         foregroundColor: widget.buttonTextColor,

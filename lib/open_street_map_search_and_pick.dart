@@ -31,6 +31,16 @@ class OpenStreetMapSearchAndPick extends StatefulWidget {
   final double buttonWidth;
   final TextStyle buttonTextStyle;
   final String baseUri;
+  // Customisations du champ de recherche
+  final Color searchFieldBackgroundColor;
+  final IconData searchFieldPrefixIcon;
+  // Validation
+  final bool requiredField;
+  final String requiredMessage;
+  final String? allowedCountryCode; // ex: 'FR'
+  final String? allowedCountryName; // ex: 'France'
+  final String wrongCountryMessage;
+  final AutovalidateMode autovalidateMode;
 
   const OpenStreetMapSearchAndPick({
     Key? key,
@@ -52,6 +62,14 @@ class OpenStreetMapSearchAndPick extends StatefulWidget {
     this.buttonWidth = 200,
     this.baseUri = 'https://nominatim.openstreetmap.org',
     this.locationPinIcon = Icons.location_on,
+    this.searchFieldBackgroundColor = Colors.white,
+    this.searchFieldPrefixIcon = Icons.gps_fixed,
+    this.requiredField = false,
+    this.requiredMessage = 'This field is required',
+    this.allowedCountryCode,
+    this.allowedCountryName,
+    this.wrongCountryMessage = 'The address is not in the required country',
+    this.autovalidateMode = AutovalidateMode.onUserInteraction,
   }) : super(key: key);
 
   @override
@@ -68,6 +86,8 @@ class _OpenStreetMapSearchAndPickState
   Timer? _debounce;
   var client = http.Client();
   late Future<Position?> latlongFuture;
+  String? _lastCountryCode;
+  String? _lastCountryName;
 
   Future<Position?> getCurrentPosLatLong() async {
     LocationPermission locationPermission = await Geolocator.checkPermission();
@@ -113,6 +133,9 @@ class _OpenStreetMapSearchAndPickState
 
     _searchController.text =
         decodedResponse['display_name'] ?? "MOVE TO CURRENT POSITION";
+    final address = (decodedResponse['address'] as Map?)?.cast<String, dynamic>();
+    _lastCountryCode = address != null ? (address['country_code'] as String?)?.toUpperCase() : null;
+    _lastCountryName = address != null ? address['country'] as String? : null;
     setState(() {});
   }
 
@@ -134,6 +157,9 @@ class _OpenStreetMapSearchAndPickState
 
     _searchController.text =
         decodedResponse['display_name'] ?? "MOVE TO CURRENT POSITION";
+    final address = (decodedResponse['address'] as Map?)?.cast<String, dynamic>();
+    _lastCountryCode = address != null ? (address['country_code'] as String?)?.toUpperCase() : null;
+    _lastCountryName = address != null ? address['country'] as String? : null;
   }
 
   @override
@@ -153,6 +179,9 @@ class _OpenStreetMapSearchAndPickState
               as Map<dynamic, dynamic>;
 
           _searchController.text = decodedResponse['display_name'];
+          final address = (decodedResponse['address'] as Map?)?.cast<String, dynamic>();
+          _lastCountryCode = address != null ? (address['country_code'] as String?)?.toUpperCase() : null;
+          _lastCountryName = address != null ? address['country'] as String? : null;
           setState(() {});
         }
       },
@@ -308,10 +337,32 @@ class _OpenStreetMapSearchAndPickState
                       TextFormField(
                           controller: _searchController,
                           focusNode: _focusNode,
+                          autovalidateMode: widget.autovalidateMode,
+                          validator: (value) {
+                            final text = value?.trim() ?? '';
+                            if (widget.requiredField && text.isEmpty) {
+                              return widget.requiredMessage;
+                            }
+                            if (widget.allowedCountryCode != null) {
+                              if (_lastCountryCode == null || _lastCountryCode!.toUpperCase() != widget.allowedCountryCode!.toUpperCase()) {
+                                final expected = widget.allowedCountryName ?? widget.allowedCountryCode;
+                                return '${widget.wrongCountryMessage} (${expected})';
+                              }
+                            } else if (widget.allowedCountryName != null) {
+                              if (_lastCountryName == null || _lastCountryName!.toLowerCase() != widget.allowedCountryName!.toLowerCase()) {
+                                return '${widget.wrongCountryMessage} (${widget.allowedCountryName})';
+                              }
+                            }
+                            return null;
+                          },
                           decoration: InputDecoration(
                             hintText: widget.hintText,
                             border: inputBorder,
                             focusedBorder: inputFocusBorder,
+                            enabledBorder: inputBorder,
+                            filled: true,
+                            fillColor: widget.searchFieldBackgroundColor,
+                            prefixIcon: Icon(widget.searchFieldPrefixIcon, color: widget.buttonColor),
                           ),
                           onChanged: (String value) {
                             if (_debounce?.isActive ?? false) {
