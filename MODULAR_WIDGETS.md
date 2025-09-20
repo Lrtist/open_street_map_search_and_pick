@@ -30,6 +30,8 @@ Widget de carte indépendant avec contrôles optionnels.
 ```dart
 OSMMapView(
   controller: controller,
+  // Place la carte automatiquement sur un pays (code ISO2)
+  initialCountry: 'FR',
   showZoomControls: true,
   showCurrentLocationButton: true,
   showLocationPin: true,
@@ -99,6 +101,8 @@ class _ConnectedWidgetsExampleState extends State<ConnectedWidgetsExample> {
         Expanded(
           child: OSMMapView(
             controller: sharedController,
+            // Exemple: démarrer sur la Côte d'Ivoire
+            initialCountry: 'CI',
             showZoomControls: true,
           ),
         ),
@@ -199,6 +203,7 @@ class CustomLayoutExample extends StatelessWidget {
 - `searchLocation(query)`: Effectue une recherche
 - `selectLocation(location)`: Sélectionne une location
 - `moveToPosition(position, zoom)`: Déplace la carte
+- `moveToCountry(iso2)`: Ajuste la carte pour afficher entièrement le pays donné par son code ISO2 (ex: `FR`)
 - `zoomIn()` / `zoomOut()`: Contrôles de zoom
 - `getCurrentPickedData()`: Récupère les données actuelles
 
@@ -217,6 +222,7 @@ class CustomLayoutExample extends StatelessWidget {
 #### Propriétés Principales
 - `controller`: Le contrôleur OSM
 - `initialCenter`: Position initiale de la carte
+- `initialCountry`: Code pays ISO2. Si défini, la carte s'ajuste pour afficher tout le pays.
 - `showZoomControls`: Afficher les contrôles de zoom
 - `showCurrentLocationButton`: Afficher le bouton de position actuelle
 - `showLocationPin`: Afficher le pin de position

@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:http/http.dart' as http;
 import 'package:latlong2/latlong.dart';
+import 'package:flutter_map/flutter_map.dart' as fm;
 
 /// Contrôleur pour gérer la communication entre le champ de recherche et la carte
 class OSMController extends ChangeNotifier {
@@ -222,6 +223,71 @@ class OSMController extends ChangeNotifier {
   /// Déplace la carte vers une position spécifique
   void moveToPosition(LatLng position, {double? zoom}) {
     _mapController.move(position, zoom ?? _mapController.zoom);
+  }
+
+  /// Déplace et ajuste la carte pour afficher entièrement un pays donné par son code ISO2 (ex: 'FR')
+  Future<void> moveToCountry(String iso2, {EdgeInsets padding = const EdgeInsets.all(16)}) async {
+    if (iso2.trim().isEmpty) return;
+    final code = iso2.trim().toLowerCase();
+    try {
+      // Requête Nominatim pour récupérer la bounding box du pays
+      String url = '$_baseUri/search?format=json&limit=1&addressdetails=0&polygon_geojson=0&countrycodes=$code';
+      if (_email != null && _email!.isNotEmpty) {
+        url = '$url&email=${Uri.encodeComponent(_email!)}';
+      }
+      var response = await _client.get(Uri.parse(url), headers: _buildHeaders());
+      if (response.statusCode == 429) {
+        await Future.delayed(const Duration(seconds: 2));
+        response = await _client.get(Uri.parse(url), headers: _buildHeaders());
+      }
+      final decoded = jsonDecode(utf8.decode(response.bodyBytes));
+      if (decoded is List && decoded.isNotEmpty) {
+        final first = decoded.first as Map;
+        final bbox = (first['boundingbox'] as List?)?.cast<String>();
+        if (bbox != null && bbox.length == 4) {
+          // Nominatim renvoie [south, north, west, east]
+          final south = double.tryParse(bbox[0]);
+          final north = double.tryParse(bbox[1]);
+          final west = double.tryParse(bbox[2]);
+          final east = double.tryParse(bbox[3]);
+          if (south != null && north != null && west != null && east != null) {
+            final bounds = LatLngBounds(LatLng(south, west), LatLng(north, east));
+            _fitBounds(bounds, padding: padding);
+            return;
+          }
+        }
+        // Fallback: centrer sur le point si fourni
+        final lat = double.tryParse(first['lat']?.toString() ?? '');
+        final lon = double.tryParse(first['lon']?.toString() ?? '');
+        if (lat != null && lon != null) {
+          _mapController.move(LatLng(lat, lon), 6.0);
+        }
+      }
+    } catch (e) {
+      if (kDebugMode) {
+        print('Erreur moveToCountry($iso2): $e');
+      }
+    }
+  }
+
+  /// Ajuste la caméra pour faire rentrer les bounds visibles avec padding
+  void _fitBounds(LatLngBounds bounds, {EdgeInsets padding = const EdgeInsets.all(16)}) {
+    try {
+      // flutter_map v4+ API
+      _mapController.fitCamera(
+        fm.CameraFit.bounds(
+          bounds: bounds,
+          padding: padding,
+        ),
+      );
+    } catch (_) {
+      // Fallback si fitCamera indisponible: se centrer approximativement
+      final center = LatLng(
+        (bounds.north + bounds.south) / 2,
+        (bounds.east + bounds.west) / 2,
+      );
+      _mapController.move(center, 5.0);
+    }
   }
   
   /// Zoom avant

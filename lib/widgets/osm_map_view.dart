@@ -9,6 +9,7 @@ class OSMMapView extends StatefulWidget {
   final double? width;
   final double? height;
   final LatLng? initialCenter;
+  final String? initialCountry; // ISO2, ex: 'FR'
   final double initialZoom;
   final double maxZoom;
   final double minZoom;
@@ -38,6 +39,7 @@ class OSMMapView extends StatefulWidget {
     this.width,
     this.height,
     this.initialCenter,
+    this.initialCountry,
     this.initialZoom = 15.0,
     this.maxZoom = 18.0,
     this.minZoom = 6.0,
@@ -57,8 +59,9 @@ class OSMMapView extends StatefulWidget {
     this.currentLocationIcon = Icons.my_location,
     this.buttonColor = Colors.blue,
     this.buttonTextColor = Colors.white,
-    this.tileLayerUrl = "https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",
-    this.tileLayerSubdomains = const ['a', 'b', 'c'],
+    this.tileLayerUrl = "https://tile.openstreetmap.org/{z}/{x}/{y}.png",
+    // OSM recommendation: avoid subdomains
+    this.tileLayerSubdomains = const [],
     this.controlsMargin,
     this.controlsAlignment,
     this.onCurrentLocationPressed,
@@ -85,6 +88,12 @@ class _OSMMapViewState extends State<OSMMapView> {
     widget.controller.ensureMapListener();
     widget.controller.addLocationChangedListener(_onControllerLocationChanged);
     widget.controller.addAddressSelectedListener(_onControllerAddressSelected);
+    // Si un pays initial est fourni, ajuste la carte après le premier frame
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (widget.initialCountry != null && widget.initialCountry!.trim().isNotEmpty) {
+        widget.controller.moveToCountry(widget.initialCountry!);
+      }
+    });
   }
 
   @override
@@ -96,6 +105,12 @@ class _OSMMapViewState extends State<OSMMapView> {
       widget.controller.ensureMapListener();
       widget.controller.addLocationChangedListener(_onControllerLocationChanged);
       widget.controller.addAddressSelectedListener(_onControllerAddressSelected);
+    }
+    if (oldWidget.initialCountry != widget.initialCountry &&
+        widget.initialCountry != null && widget.initialCountry!.trim().isNotEmpty) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        widget.controller.moveToCountry(widget.initialCountry!);
+      });
     }
   }
 
@@ -300,8 +315,8 @@ class OSMMapViewSimple extends StatelessWidget {
       ),
       children: [
         TileLayer(
-          urlTemplate: "https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",
-          subdomains: const ['a', 'b', 'c'],
+          urlTemplate: "https://tile.openstreetmap.org/{z}/{x}/{y}.png",
+          subdomains: const [],
         ),
       ],
     );

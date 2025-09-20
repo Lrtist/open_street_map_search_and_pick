@@ -13,6 +13,7 @@ enum SearchFieldPlacement { overlay, top }
 /// Utilise les nouveaux composants séparés pour plus de flexibilité
 class OpenStreetMapSearchAndPickModular extends StatefulWidget {
   final void Function(PickedData pickedData) onPicked;
+  final String? initialCountry; // ISO2, ex: 'FR'
   final IconData zoomInIcon;
   final IconData zoomOutIcon;
   final IconData currentLocationIcon;
@@ -61,6 +62,7 @@ class OpenStreetMapSearchAndPickModular extends StatefulWidget {
   const OpenStreetMapSearchAndPickModular({
     Key? key,
     required this.onPicked,
+    this.initialCountry,
     this.zoomOutIcon = Icons.zoom_out_map,
     this.zoomInIcon = Icons.zoom_in_map,
     this.currentLocationIcon = Icons.my_location,
@@ -193,6 +195,7 @@ class _OpenStreetMapSearchAndPickModularState
                       child: OSMMapView(
                         controller: _osmController,
                         initialCenter: initialCenter,
+                        initialCountry: widget.initialCountry,
                         showZoomControls: widget.showMapControls,
                         showCurrentLocationButton: widget.showMapControls,
                         showLocationPin: widget.showLocationPin,
@@ -308,6 +311,7 @@ class _OpenStreetMapSearchAndPickModularState
                       child: OSMMapView(
                         controller: _osmController,
                         initialCenter: initialCenter,
+                        initialCountry: widget.initialCountry,
                         showZoomControls: widget.showMapControls,
                         showCurrentLocationButton: widget.showMapControls,
                         showLocationPin: widget.showLocationPin,
@@ -355,6 +359,7 @@ class _OpenStreetMapSearchAndPickModularState
 class OSMSearchAndMapWidget extends StatefulWidget {
   final OSMController? controller;
   final LatLng? initialCenter;
+  final String? initialCountry; // ISO2, ex: 'FR'
   final double initialZoom;
   final String hintText;
   final Color primaryColor;
@@ -368,6 +373,7 @@ class OSMSearchAndMapWidget extends StatefulWidget {
     Key? key,
     this.controller,
     this.initialCenter,
+    this.initialCountry,
     this.initialZoom = 15.0,
     this.hintText = 'Rechercher une adresse...',
     this.primaryColor = Colors.blue,
@@ -424,6 +430,7 @@ class _OSMSearchAndMapWidgetState extends State<OSMSearchAndMapWidget> {
           child: OSMMapView(
             controller: _controller,
             initialCenter: widget.initialCenter,
+            initialCountry: widget.initialCountry,
             initialZoom: widget.initialZoom,
             showZoomControls: widget.showMapControls,
             showCurrentLocationButton: widget.showMapControls,

@@ -237,7 +237,7 @@ class _OpenStreetMapSearchAndPickState
                     TileLayer(
                       urlTemplate:
                           "https://tile.openstreetmap.org/{z}/{x}/{y}.png",
-                      subdomains: const ['a', 'b', 'c'],
+                      subdomains: const [],
                       // attributionBuilder: (_) {
                       //   return Text("© OpenStreetMap contributors");
                       // },
