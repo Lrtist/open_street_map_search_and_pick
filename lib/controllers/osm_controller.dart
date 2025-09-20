@@ -231,7 +231,9 @@ class OSMController extends ChangeNotifier {
     final code = iso2.trim().toLowerCase();
     try {
       // Requête Nominatim pour récupérer la bounding box du pays
-      String url = '$_baseUri/search?format=json&limit=1&addressdetails=0&polygon_geojson=0&countrycodes=$code';
+      // Ajoute un terme de recherche pour stabiliser le résultat et filtre par pays
+      // countrycodes restreint aux codes ISO2, limit=5 pour choisir le meilleur résultat
+      String url = '$_baseUri/search?format=json&limit=5&addressdetails=0&polygon_geojson=0&countrycodes=$code&q=$code';
       if (_email != null && _email!.isNotEmpty) {
         url = '$url&email=${Uri.encodeComponent(_email!)}';
       }
@@ -242,8 +244,21 @@ class OSMController extends ChangeNotifier {
       }
       final decoded = jsonDecode(utf8.decode(response.bodyBytes));
       if (decoded is List && decoded.isNotEmpty) {
-        final first = decoded.first as Map;
-        final bbox = (first['boundingbox'] as List?)?.cast<String>();
+        // Choisir un résultat correspondant à la frontière administrative (pays) si possible
+        Map first = decoded.first as Map;
+        Map? best;
+        for (final e in decoded) {
+          if (e is Map) {
+            final cls = e['class'];
+            final type = e['type'];
+            if (cls == 'boundary' && type == 'administrative') {
+              best = e;
+              break;
+            }
+          }
+        }
+        final result = best ?? first;
+        final bbox = (result['boundingbox'] as List?)?.cast<String>();
         if (bbox != null && bbox.length == 4) {
           // Nominatim renvoie [south, north, west, east]
           final south = double.tryParse(bbox[0]);
@@ -257,8 +272,8 @@ class OSMController extends ChangeNotifier {
           }
         }
         // Fallback: centrer sur le point si fourni
-        final lat = double.tryParse(first['lat']?.toString() ?? '');
-        final lon = double.tryParse(first['lon']?.toString() ?? '');
+        final lat = double.tryParse(result['lat']?.toString() ?? '');
+        final lon = double.tryParse(result['lon']?.toString() ?? '');
         if (lat != null && lon != null) {
           _mapController.move(LatLng(lat, lon), 6.0);
         }

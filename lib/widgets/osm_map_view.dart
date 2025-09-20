@@ -42,7 +42,7 @@ class OSMMapView extends StatefulWidget {
     this.initialCountry,
     this.initialZoom = 15.0,
     this.maxZoom = 18.0,
-    this.minZoom = 6.0,
+    this.minZoom = 2.0,
     this.showZoomControls = true,
     this.showCurrentLocationButton = true,
     this.showLocationPin = true,
@@ -264,7 +264,7 @@ class OSMMapViewCustom extends StatelessWidget {
                 center: const LatLng(48.8566, 2.3522), // Paris par défaut
                 zoom: 15.0,
                 maxZoom: 18.0,
-                minZoom: 6.0,
+                minZoom: 2.0,
               ),
           children: mapLayers ??
               [
