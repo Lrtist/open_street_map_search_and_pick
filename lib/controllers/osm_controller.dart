@@ -63,6 +63,12 @@ class OSMController extends ChangeNotifier {
     _baseUri = uri;
   }
 
+  /// Vide explicitement la liste des suggestions
+  void clearSearchOptions() {
+    _searchOptions.clear();
+    notifyListeners();
+  }
+
   // API listeners
   void addLocationChangedListener(void Function(LatLng center, Map<String, dynamic>? address) listener) {
     _locationChangedListeners.add(listener);
@@ -205,6 +211,10 @@ class OSMController extends ChangeNotifier {
       notifyListeners();
       return;
     }
+    // Ne pas lancer de recherche si le champ n'est pas focus
+    if (!_focusNode.hasFocus) {
+      return;
+    }
     
     if (_debounce?.isActive ?? false) {
       _debounce?.cancel();
@@ -244,6 +254,11 @@ class OSMController extends ChangeNotifier {
   
   /// Sélectionne une location depuis les résultats de recherche
   void selectLocation(OSMdata location) {
+    // Annuler toute recherche en attente pour éviter la réapparition des suggestions
+    if (_debounce?.isActive ?? false) {
+      _debounce?.cancel();
+    }
+    _debounce = null;
     _mapController.move(LatLng(location.lat, location.lon), 15.0);
     _searchController.text = location.displayname;
     _focusNode.unfocus();

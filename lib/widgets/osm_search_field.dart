@@ -172,7 +172,7 @@ class OSMSearchField extends StatelessWidget {
     return AnimatedBuilder(
       animation: controller,
       builder: (context, child) {
-        if (controller.searchOptions.isEmpty) {
+        if (controller.searchOptions.isEmpty || !controller.focusNode.hasFocus) {
           return const SizedBox.shrink();
         }
 
@@ -254,12 +254,26 @@ class _OSMFieldListenersState extends State<_OSMFieldListeners> {
     widget.onAddressSelectedFormatted?.call(d, f);
   }
 
+  void _onFocusChange() {
+    if (!widget.controller.focusNode.hasFocus) {
+      // Perte de focus: masquer les suggestions
+      widget.controller.clearSearchOptions();
+    } else {
+      // Gain de focus: relancer la recherche si du texte est présent
+      final text = widget.controller.searchController.text.trim();
+      if (text.isNotEmpty) {
+        widget.controller.searchLocation(text);
+      }
+    }
+  }
+
   @override
   void initState() {
     super.initState();
     widget.controller.addLocationChangedListener(_handler);
     widget.controller.addLocationChangedExListener(_handlerEx);
     widget.controller.addAddressSelectedExListener(_addressSelectedEx);
+    widget.controller.focusNode.addListener(_onFocusChange);
   }
 
   @override
@@ -272,6 +286,8 @@ class _OSMFieldListenersState extends State<_OSMFieldListeners> {
       oldWidget.controller.removeAddressSelectedExListener(_addressSelectedEx);
       widget.controller.addLocationChangedExListener(_handlerEx);
       widget.controller.addAddressSelectedExListener(_addressSelectedEx);
+      oldWidget.controller.focusNode.removeListener(_onFocusChange);
+      widget.controller.focusNode.addListener(_onFocusChange);
     }
   }
 
@@ -280,6 +296,7 @@ class _OSMFieldListenersState extends State<_OSMFieldListeners> {
     widget.controller.removeLocationChangedListener(_handler);
     widget.controller.removeLocationChangedExListener(_handlerEx);
     widget.controller.removeAddressSelectedExListener(_addressSelectedEx);
+    widget.controller.focusNode.removeListener(_onFocusChange);
     super.dispose();
   }
 
