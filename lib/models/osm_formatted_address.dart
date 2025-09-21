@@ -100,6 +100,17 @@ class OSMFormattedAddress {
   /// Nom du pays
   String? get country => address?['country'];
 
+  /// Meilleure approximation de la ville depuis les champs d'adresse
+  /// Ordre de priorité: city, town, village, municipality, hamlet, suburb, county
+  String? get town =>
+      address?['city'] ??
+      address?['town'] ??
+      address?['village'] ??
+      address?['municipality'] ??
+      address?['hamlet'] ??
+      address?['suburb'] ??
+      address?['county'];
+
   /// Méthode utilitaire pour parser une liste JSON
   static List<OSMFormattedAddress> fromJsonList(String jsonString) {
     final data = json.decode(jsonString);
