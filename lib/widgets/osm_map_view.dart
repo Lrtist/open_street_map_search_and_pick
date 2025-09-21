@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
 import '../controllers/osm_controller.dart';
+import '../models/osm_formatted_address.dart';
 
 /// Widget de carte indépendant pour OpenStreetMap
 class OSMMapView extends StatefulWidget {
@@ -32,6 +33,9 @@ class OSMMapView extends StatefulWidget {
   final VoidCallback? onCurrentLocationPressed;
   final void Function(LatLng center, Map<String, dynamic>? address)? onLocationChanged;
   final void Function(OSMdata address)? onAddressSelected;
+  // Nouveaux callbacks avec adresse formatée
+  final void Function(LatLng center, Map<String, dynamic>? address, OSMFormattedAddress? formatted)? onLocationChangedFormatted;
+  final void Function(OSMdata address, OSMFormattedAddress? formatted)? onAddressSelectedFormatted;
 
   const OSMMapView({
     Key? key,
@@ -67,6 +71,8 @@ class OSMMapView extends StatefulWidget {
     this.onCurrentLocationPressed,
     this.onLocationChanged,
     this.onAddressSelected,
+    this.onLocationChangedFormatted,
+    this.onAddressSelectedFormatted,
   }) : super(key: key);
 
   @override
@@ -82,12 +88,22 @@ class _OSMMapViewState extends State<OSMMapView> {
     widget.onAddressSelected?.call(d);
   }
 
+  void _onControllerLocationChangedEx(LatLng c, Map<String, dynamic>? a, OSMFormattedAddress? f) {
+    widget.onLocationChangedFormatted?.call(c, a, f);
+  }
+
+  void _onControllerAddressSelectedEx(OSMdata d, OSMFormattedAddress? f) {
+    widget.onAddressSelectedFormatted?.call(d, f);
+  }
+
   @override
   void initState() {
     super.initState();
     widget.controller.ensureMapListener();
     widget.controller.addLocationChangedListener(_onControllerLocationChanged);
     widget.controller.addAddressSelectedListener(_onControllerAddressSelected);
+    widget.controller.addLocationChangedExListener(_onControllerLocationChangedEx);
+    widget.controller.addAddressSelectedExListener(_onControllerAddressSelectedEx);
     // Si un pays initial est fourni, ajuste la carte après le premier frame
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (widget.initialCountry != null && widget.initialCountry!.trim().isNotEmpty) {
@@ -102,9 +118,13 @@ class _OSMMapViewState extends State<OSMMapView> {
     if (oldWidget.controller != widget.controller) {
       oldWidget.controller.removeLocationChangedListener(_onControllerLocationChanged);
       oldWidget.controller.removeAddressSelectedListener(_onControllerAddressSelected);
+      oldWidget.controller.removeLocationChangedExListener(_onControllerLocationChangedEx);
+      oldWidget.controller.removeAddressSelectedExListener(_onControllerAddressSelectedEx);
       widget.controller.ensureMapListener();
       widget.controller.addLocationChangedListener(_onControllerLocationChanged);
       widget.controller.addAddressSelectedListener(_onControllerAddressSelected);
+      widget.controller.addLocationChangedExListener(_onControllerLocationChangedEx);
+      widget.controller.addAddressSelectedExListener(_onControllerAddressSelectedEx);
     }
     if (oldWidget.initialCountry != widget.initialCountry &&
         widget.initialCountry != null && widget.initialCountry!.trim().isNotEmpty) {
@@ -118,6 +138,8 @@ class _OSMMapViewState extends State<OSMMapView> {
   void dispose() {
     widget.controller.removeLocationChangedListener(_onControllerLocationChanged);
     widget.controller.removeAddressSelectedListener(_onControllerAddressSelected);
+    widget.controller.removeLocationChangedExListener(_onControllerLocationChangedEx);
+    widget.controller.removeAddressSelectedExListener(_onControllerAddressSelectedEx);
     super.dispose();
   }
 

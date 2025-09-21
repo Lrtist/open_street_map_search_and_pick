@@ -5,6 +5,7 @@ import '../controllers/osm_controller.dart';
 import 'osm_search_field.dart';
 import 'osm_map_view.dart';
 import 'wide_button.dart';
+import '../models/osm_formatted_address.dart';
 
 /// Emplacement du champ de recherche
 enum SearchFieldPlacement { overlay, top }
@@ -58,6 +59,9 @@ class OpenStreetMapSearchAndPickModular extends StatefulWidget {
   // Callbacks
   final void Function(OSMdata address)? onAddressSelected;
   final void Function(LatLng center, Map<String, dynamic>? address)? onLocationChanged;
+  // Nouveaux callbacks avec adresse formatée
+  final void Function(OSMdata address, OSMFormattedAddress? formatted)? onAddressSelectedFormatted;
+  final void Function(LatLng center, Map<String, dynamic>? address, OSMFormattedAddress? formatted)? onLocationChangedFormatted;
 
   const OpenStreetMapSearchAndPickModular({
     Key? key,
@@ -104,6 +108,8 @@ class OpenStreetMapSearchAndPickModular extends StatefulWidget {
     this.searchHintTextColor,
     this.onAddressSelected,
     this.onLocationChanged,
+    this.onAddressSelectedFormatted,
+    this.onLocationChangedFormatted,
   }) : super(key: key);
 
   @override
@@ -211,6 +217,8 @@ class _OpenStreetMapSearchAndPickModularState
                         onCurrentLocationPressed: _onCurrentLocationPressed,
                         onLocationChanged: widget.onLocationChanged,
                         onAddressSelected: widget.onAddressSelected,
+                        onLocationChangedFormatted: widget.onLocationChangedFormatted,
+                        onAddressSelectedFormatted: widget.onAddressSelectedFormatted,
                       ),
                     ),
                     // Champ en overlay
@@ -242,6 +250,8 @@ class _OpenStreetMapSearchAndPickModularState
                             hintTextColor: widget.searchHintTextColor,
                             onAddressSelected: widget.onAddressSelected,
                             onLocationChanged: widget.onLocationChanged,
+                            onAddressSelectedFormatted: widget.onAddressSelectedFormatted,
+                            onLocationChangedFormatted: widget.onLocationChangedFormatted,
                           ),
                         ),
                       ),
@@ -301,6 +311,8 @@ class _OpenStreetMapSearchAndPickModularState
                             hintTextColor: widget.searchHintTextColor,
                             onAddressSelected: widget.onAddressSelected,
                             onLocationChanged: widget.onLocationChanged,
+                            onAddressSelectedFormatted: widget.onAddressSelectedFormatted,
+                            onLocationChangedFormatted: widget.onLocationChangedFormatted,
                           ),
                         ),
                       ),
@@ -327,6 +339,8 @@ class _OpenStreetMapSearchAndPickModularState
                         onCurrentLocationPressed: _onCurrentLocationPressed,
                         onLocationChanged: widget.onLocationChanged,
                         onAddressSelected: widget.onAddressSelected,
+                        onLocationChangedFormatted: widget.onLocationChangedFormatted,
+                        onAddressSelectedFormatted: widget.onAddressSelectedFormatted,
                       ),
                     ),
                     if (widget.showPickButton)

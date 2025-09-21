@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:latlong2/latlong.dart';
 import '../controllers/osm_controller.dart';
+import '../models/osm_formatted_address.dart';
 
 /// Widget de champ de recherche indépendant pour OpenStreetMap
 class OSMSearchField extends StatelessWidget {
@@ -29,6 +30,9 @@ class OSMSearchField extends StatelessWidget {
   final Color? hintTextColor;
   final void Function(OSMdata address)? onAddressSelected;
   final void Function(LatLng center, Map<String, dynamic>? address)? onLocationChanged;
+  // Nouveaux callbacks avec adresse formatée
+  final void Function(OSMdata address, OSMFormattedAddress? formatted)? onAddressSelectedFormatted;
+  final void Function(LatLng center, Map<String, dynamic>? address, OSMFormattedAddress? formatted)? onLocationChangedFormatted;
 
   const OSMSearchField({
     Key? key,
@@ -57,6 +61,8 @@ class OSMSearchField extends StatelessWidget {
     this.hintTextColor,
     this.onAddressSelected,
     this.onLocationChanged,
+    this.onAddressSelectedFormatted,
+    this.onLocationChangedFormatted,
   }) : super(key: key);
 
   @override
@@ -76,7 +82,12 @@ class OSMSearchField extends StatelessWidget {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              _OSMFieldListeners(controller: controller, onLocationChanged: onLocationChanged),
+              _OSMFieldListeners(
+                controller: controller,
+                onLocationChanged: onLocationChanged,
+                onLocationChangedFormatted: onLocationChangedFormatted,
+                onAddressSelectedFormatted: onAddressSelectedFormatted,
+              ),
               _buildSearchField(),
               if (showSuggestions) _buildSuggestionsList(),
             ],
@@ -210,6 +221,9 @@ class OSMSearchField extends StatelessWidget {
         if (onAddressSelected != null) {
           onAddressSelected!(suggestion);
         }
+        if (onAddressSelectedFormatted != null) {
+          onAddressSelectedFormatted!(suggestion, controller.lastFormattedAddress);
+        }
       },
     );
   }
@@ -219,7 +233,9 @@ class OSMSearchField extends StatelessWidget {
 class _OSMFieldListeners extends StatefulWidget {
   final OSMController controller;
   final void Function(LatLng center, Map<String, dynamic>? address)? onLocationChanged;
-  const _OSMFieldListeners({Key? key, required this.controller, this.onLocationChanged}) : super(key: key);
+  final void Function(LatLng center, Map<String, dynamic>? address, OSMFormattedAddress? formatted)? onLocationChangedFormatted;
+  final void Function(OSMdata address, OSMFormattedAddress? formatted)? onAddressSelectedFormatted;
+  const _OSMFieldListeners({Key? key, required this.controller, this.onLocationChanged, this.onLocationChangedFormatted, this.onAddressSelectedFormatted}) : super(key: key);
 
   @override
   State<_OSMFieldListeners> createState() => _OSMFieldListenersState();
@@ -230,10 +246,20 @@ class _OSMFieldListenersState extends State<_OSMFieldListeners> {
     widget.onLocationChanged?.call(c, a);
   }
 
+  void _handlerEx(LatLng c, Map<String, dynamic>? a, OSMFormattedAddress? f) {
+    widget.onLocationChangedFormatted?.call(c, a, f);
+  }
+
+  void _addressSelectedEx(OSMdata d, OSMFormattedAddress? f) {
+    widget.onAddressSelectedFormatted?.call(d, f);
+  }
+
   @override
   void initState() {
     super.initState();
     widget.controller.addLocationChangedListener(_handler);
+    widget.controller.addLocationChangedExListener(_handlerEx);
+    widget.controller.addAddressSelectedExListener(_addressSelectedEx);
   }
 
   @override
@@ -242,12 +268,18 @@ class _OSMFieldListenersState extends State<_OSMFieldListeners> {
     if (oldWidget.controller != widget.controller) {
       oldWidget.controller.removeLocationChangedListener(_handler);
       widget.controller.addLocationChangedListener(_handler);
+      oldWidget.controller.removeLocationChangedExListener(_handlerEx);
+      oldWidget.controller.removeAddressSelectedExListener(_addressSelectedEx);
+      widget.controller.addLocationChangedExListener(_handlerEx);
+      widget.controller.addAddressSelectedExListener(_addressSelectedEx);
     }
   }
 
   @override
   void dispose() {
     widget.controller.removeLocationChangedListener(_handler);
+    widget.controller.removeLocationChangedExListener(_handlerEx);
+    widget.controller.removeAddressSelectedExListener(_addressSelectedEx);
     super.dispose();
   }
 

@@ -6,6 +6,7 @@ import 'package:flutter_map/flutter_map.dart';
 import 'package:http/http.dart' as http;
 import 'package:latlong2/latlong.dart';
 import 'package:flutter_map/flutter_map.dart' as fm;
+import '../models/osm_formatted_address.dart';
 
 /// Contrôleur pour gérer la communication entre le champ de recherche et la carte
 class OSMController extends ChangeNotifier {
@@ -32,10 +33,14 @@ class OSMController extends ChangeNotifier {
   String? _lastCountryCode;
   String? _lastCountryName;
   LatLng? _lastCenter;
+  OSMFormattedAddress? _lastFormattedAddress;
 
   // Listeners
   final List<void Function(LatLng center, Map<String, dynamic>? address)> _locationChangedListeners = [];
   final List<void Function(OSMdata location)> _addressSelectedListeners = [];
+  // Listeners étendus avec adresse formatée
+  final List<void Function(LatLng center, Map<String, dynamic>? address, OSMFormattedAddress? formatted)> _locationChangedExListeners = [];
+  final List<void Function(OSMdata location, OSMFormattedAddress? formatted)> _addressSelectedExListeners = [];
   
   // Getters
   MapController get mapController => _mapController;
@@ -51,6 +56,7 @@ class OSMController extends ChangeNotifier {
   Duration get minReverseInterval => _minReverseInterval;
   double get minReverseMoveMeters => _minReverseMoveMeters;
   LatLng? get lastCenter => _lastCenter;
+  OSMFormattedAddress? get lastFormattedAddress => _lastFormattedAddress;
   
   // Setters
   set baseUri(String uri) {
@@ -77,6 +83,27 @@ class OSMController extends ChangeNotifier {
   set email(String? em) => _email = em;
   set minReverseInterval(Duration d) => _minReverseInterval = d;
   set minReverseMoveMeters(double m) => _minReverseMoveMeters = m;
+
+  // API listeners étendus
+  void addLocationChangedExListener(
+      void Function(LatLng center, Map<String, dynamic>? address, OSMFormattedAddress? formatted) listener) {
+    _locationChangedExListeners.add(listener);
+  }
+
+  void removeLocationChangedExListener(
+      void Function(LatLng center, Map<String, dynamic>? address, OSMFormattedAddress? formatted) listener) {
+    _locationChangedExListeners.remove(listener);
+  }
+
+  void addAddressSelectedExListener(
+      void Function(OSMdata location, OSMFormattedAddress? formatted) listener) {
+    _addressSelectedExListeners.add(listener);
+  }
+
+  void removeAddressSelectedExListener(
+      void Function(OSMdata location, OSMFormattedAddress? formatted) listener) {
+    _addressSelectedExListeners.remove(listener);
+  }
   
   /// Initialise le contrôleur avec une position initiale
   void initialize({LatLng? initialPosition}) {
@@ -149,10 +176,20 @@ class OSMController extends ChangeNotifier {
       _lastAddress = address;
       _lastCountryCode = address != null ? (address['country_code'] as String?)?.toUpperCase() : null;
       _lastCountryName = address != null ? address['country'] as String? : null;
+      // Construire et stocker l'adresse formatée
+      _lastFormattedAddress = OSMFormattedAddress(
+        placeId: decodedResponse['place_id']?.toString(),
+        displayName: decodedResponse['display_name'] as String?,
+        address: address,
+      );
       notifyListeners();
       // Notifier listeners de changement de position
       for (final l in _locationChangedListeners) {
         try { l(current, address); } catch (_) {}
+      }
+      // Notifier les listeners étendus
+      for (final l in _locationChangedExListeners) {
+        try { l(current, address, _lastFormattedAddress); } catch (_) {}
       }
     } catch (e) {
       if (kDebugMode) {
@@ -217,6 +254,9 @@ class OSMController extends ChangeNotifier {
     // Notifier écouteurs d'adresse choisie
     for (final l in _addressSelectedListeners) {
       try { l(location); } catch (_) {}
+    }
+    for (final l in _addressSelectedExListeners) {
+      try { l(location, _lastFormattedAddress); } catch (_) {}
     }
   }
   
@@ -337,6 +377,11 @@ class OSMController extends ChangeNotifier {
       _lastAddress = address;
       _lastCountryCode = (address['country_code'] as String?)?.toUpperCase();
       _lastCountryName = address['country'] as String?;
+      _lastFormattedAddress = OSMFormattedAddress(
+        placeId: decodedResponse['place_id']?.toString(),
+        displayName: decodedResponse['display_name'] as String?,
+        address: address,
+      );
       
       return PickedData(center, displayName, address);
     } catch (e) {
