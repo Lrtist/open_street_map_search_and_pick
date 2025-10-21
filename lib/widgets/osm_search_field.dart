@@ -33,6 +33,10 @@ class OSMSearchField extends StatelessWidget {
   // Nouveaux callbacks avec adresse formatée
   final void Function(OSMdata address, OSMFormattedAddress? formatted)? onAddressSelectedFormatted;
   final void Function(LatLng center, Map<String, dynamic>? address, OSMFormattedAddress? formatted)? onLocationChangedFormatted;
+  
+  /// Fonction de validation personnalisée appelée à chaque changement d'adresse
+  /// Retourne null si valide, sinon retourne le message d'erreur
+  final String? Function(LatLng center, Map<String, dynamic>? address, OSMFormattedAddress? formatted)? validateOnChange;
 
   const OSMSearchField({
     Key? key,
@@ -63,6 +67,7 @@ class OSMSearchField extends StatelessWidget {
     this.onLocationChanged,
     this.onAddressSelectedFormatted,
     this.onLocationChangedFormatted,
+    this.validateOnChange,
   }) : super(key: key);
 
   @override
@@ -98,299 +103,73 @@ class OSMSearchField extends StatelessWidget {
   }
 
   Widget _buildSearchField() {
-    OutlineInputBorder inputBorder = OutlineInputBorder(
-      borderSide: BorderSide(color: borderColor, width: borderWidth),
-      borderRadius: borderRadius ?? BorderRadius.circular(8),
-    );
-    
-    OutlineInputBorder inputFocusBorder = OutlineInputBorder(
-      borderSide: BorderSide(color: borderColor, width: borderWidth + 1),
-      borderRadius: borderRadius ?? BorderRadius.circular(8),
-    );
-
-    // AnimatedBuilder pour rafraîchir la validation lorsque la carte bouge
-    return AnimatedBuilder(
-      animation: controller,
-      builder: (context, _) {
-        return TextFormField(
-          controller: controller.searchController,
-          focusNode: controller.focusNode,
-          style: textStyle,
-          autovalidateMode: autovalidateMode,
-          validator: validator ?? (value) {
-            final text = value?.trim() ?? '';
-            if (requiredField && text.isEmpty) {
-              return requiredMessage;
-            }
-            // Validation du pays si demandé
-            final cc = controller.lastCountryCode;
-            final cn = controller.lastCountryName;
-            if (allowedCountryCode != null && (cc == null || cc.toUpperCase() != allowedCountryCode!.toUpperCase())) {
-              // Si un nom est fourni, le montrer dans le message
-              final expected = allowedCountryName ?? allowedCountryCode;
-              return "$wrongCountryMessage (${expected})";
-            }
-            if (allowedCountryCode == null && allowedCountryName != null) {
-              if (cn == null || cn.toLowerCase() != allowedCountryName!.toLowerCase()) {
-                return "$wrongCountryMessage (${allowedCountryName})";
-              }
-            }
-            return null;
-          },
-          decoration: decoration ??
-              InputDecoration(
-                hintText: hintText,
-                hintStyle: hintTextColor != null ? TextStyle(color: hintTextColor) : null,
-                border: inputBorder,
-                focusedBorder: inputFocusBorder,
-                enabledBorder: inputBorder,
-                prefixIcon: Icon(prefixIcon, color: borderColor),
-                suffixIcon: AnimatedBuilder(
-                  animation: controller.searchController,
-                  builder: (context, child) {
-                    return controller.searchController.text.isNotEmpty
-                        ? IconButton(
-                            icon: Icon(Icons.clear, color: borderColor),
-                            onPressed: () {
-                              controller.searchController.clear();
-                              controller.searchLocation('');
-                            },
-                          )
-                        : const SizedBox.shrink();
-                  },
-                ),
-              ),
-          onChanged: (value) {
-            controller.searchLocation(value);
-          },
-        );
-      },
-    );
-  }
-
-  Widget _buildSuggestionsList() {
-    return AnimatedBuilder(
-      animation: controller,
-      builder: (context, child) {
-        if (controller.searchOptions.isEmpty || !controller.focusNode.hasFocus) {
-          return const SizedBox.shrink();
-        }
-
-        final suggestions = controller.searchOptions.take(maxSuggestions).toList();
-
-        return Container(
-          constraints: const BoxConstraints(maxHeight: 200),
-          child: ListView.builder(
-            shrinkWrap: true,
-            itemCount: suggestions.length,
-            itemBuilder: (context, index) {
-              final suggestion = suggestions[index];
-              
-              if (suggestionBuilder != null) {
-                return suggestionBuilder!(
-                  context,
-                  suggestion,
-                  () => controller.selectLocation(suggestion),
-                );
-              }
-
-              return _buildDefaultSuggestionTile(suggestion);
-            },
+    return TextFormField(
+      controller: controller.searchController,
+      focusNode: controller.focusNode,
+      style: textStyle,
+      decoration: decoration ??
+          InputDecoration(
+            hintText: hintText,
+            hintStyle: TextStyle(color: hintTextColor),
+            border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(8),
+              borderSide: BorderSide(color: borderColor, width: borderWidth),
+            ),
+            enabledBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(8),
+              borderSide: BorderSide(color: borderColor, width: borderWidth),
+            ),
+            focusedBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(8),
+              borderSide: BorderSide(color: borderColor, width: borderWidth * 1.5),
+            ),
+            prefixIcon: Icon(prefixIcon, color: borderColor),
+            filled: true,
+            fillColor: backgroundColor,
           ),
-        );
+      onChanged: (value) {
+        if (!controller.focusNode.hasFocus) {
+          controller.focusNode.requestFocus();
+        }
+        controller.searchLocation(value);
       },
+      validator: (value) {
+        final center = controller.lastCenter;
+        final address = controller.lastAddress;
+        final formatted = controller.lastFormattedAddress;
+        return _validateAddress(center, address, formatted);
+      },
+      autovalidateMode: autovalidateMode,
     );
   }
 
-  Widget _buildDefaultSuggestionTile(OSMdata suggestion) {
-    return ListTile(
-      dense: true,
-      leading: Icon(Icons.location_on, color: borderColor, size: 20),
-      title: Text(
-        suggestion.displayname,
-        style: const TextStyle(fontSize: 14),
-        maxLines: 2,
-        overflow: TextOverflow.ellipsis,
-      ),
-      subtitle: Text(
-        '${suggestion.lat.toStringAsFixed(4)}, ${suggestion.lon.toStringAsFixed(4)}',
-        style: TextStyle(fontSize: 12, color: Colors.grey[600]),
-      ),
-      onTap: () {
-        controller.selectLocation(suggestion);
-        if (onAddressSelected != null) {
-          onAddressSelected!(suggestion);
-        }
-        if (onAddressSelectedFormatted != null) {
-          onAddressSelectedFormatted!(suggestion, controller.lastFormattedAddress);
-        }
-      },
-    );
-  }
-}
-
-/// Petit widget interne pour relayer les changements de position du contrôleur
-class _OSMFieldListeners extends StatefulWidget {
-  final OSMController controller;
-  final void Function(LatLng center, Map<String, dynamic>? address)? onLocationChanged;
-  final void Function(LatLng center, Map<String, dynamic>? address, OSMFormattedAddress? formatted)? onLocationChangedFormatted;
-  final void Function(OSMdata address, OSMFormattedAddress? formatted)? onAddressSelectedFormatted;
-  const _OSMFieldListeners({Key? key, required this.controller, this.onLocationChanged, this.onLocationChangedFormatted, this.onAddressSelectedFormatted}) : super(key: key);
-
-  @override
-  State<_OSMFieldListeners> createState() => _OSMFieldListenersState();
-}
-
-class _OSMFieldListenersState extends State<_OSMFieldListeners> {
-  void _handler(LatLng c, Map<String, dynamic>? a) {
-    widget.onLocationChanged?.call(c, a);
-  }
-
-  void _handlerEx(LatLng c, Map<String, dynamic>? a, OSMFormattedAddress? f) {
-    widget.onLocationChangedFormatted?.call(c, a, f);
-  }
-
-  void _addressSelectedEx(OSMdata d, OSMFormattedAddress? f) {
-    widget.onAddressSelectedFormatted?.call(d, f);
-  }
-
-  void _onFocusChange() {
-    if (!widget.controller.focusNode.hasFocus) {
-      // Perte de focus: masquer les suggestions
-      widget.controller.clearSearchOptions();
-    } else {
-      // Gain de focus: relancer la recherche si du texte est présent
-      final text = widget.controller.searchController.text.trim();
-      if (text.isNotEmpty) {
-        widget.controller.searchLocation(text);
+  String? _validateAddress(LatLng? center, Map<String, dynamic>? address, OSMFormattedAddress? formatted) {
+    if (requiredField && (center == null || address == null)) {
+      return requiredMessage;
+    }
+    
+    if (allowedCountryCode != null && address != null) {
+      final countryCode = address['address']?['country_code'];
+      final countryName = address['address']?['country'];
+      
+      if (countryCode != allowedCountryCode && 
+          (allowedCountryName == null || countryName != allowedCountryName)) {
+        return wrongCountryMessage;
       }
     }
-  }
-
-  @override
-  void initState() {
-    super.initState();
-    widget.controller.addLocationChangedListener(_handler);
-    widget.controller.addLocationChangedExListener(_handlerEx);
-    widget.controller.addAddressSelectedExListener(_addressSelectedEx);
-    widget.controller.focusNode.addListener(_onFocusChange);
-  }
-
-  @override
-  void didUpdateWidget(covariant _OSMFieldListeners oldWidget) {
-    super.didUpdateWidget(oldWidget);
-    if (oldWidget.controller != widget.controller) {
-      oldWidget.controller.removeLocationChangedListener(_handler);
-      widget.controller.addLocationChangedListener(_handler);
-      oldWidget.controller.removeLocationChangedExListener(_handlerEx);
-      oldWidget.controller.removeAddressSelectedExListener(_addressSelectedEx);
-      widget.controller.addLocationChangedExListener(_handlerEx);
-      widget.controller.addAddressSelectedExListener(_addressSelectedEx);
-      oldWidget.controller.focusNode.removeListener(_onFocusChange);
-      widget.controller.focusNode.addListener(_onFocusChange);
+    
+    // Validation personnalisée via validateOnChange
+    if (center != null && validateOnChange != null) {
+      final validationResult = validateOnChange!(center, address, formatted);
+      if (validationResult != null) {
+        return validationResult;
+      }
     }
-  }
-
-  @override
-  void dispose() {
-    widget.controller.removeLocationChangedListener(_handler);
-    widget.controller.removeLocationChangedExListener(_handlerEx);
-    widget.controller.removeAddressSelectedExListener(_addressSelectedEx);
-    widget.controller.focusNode.removeListener(_onFocusChange);
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) => const SizedBox.shrink();
-}
-
-/// Version compacte du champ de recherche sans suggestions
-class OSMSearchFieldCompact extends StatelessWidget {
-  final OSMController controller;
-  final String hintText;
-  final InputDecoration? decoration;
-  final TextStyle? textStyle;
-  final Color borderColor;
-  final VoidCallback? onTap;
-  final bool readOnly;
-  final Color backgroundColor;
-  final IconData prefixIcon;
-  final bool requiredField;
-  final String requiredMessage;
-  final String? allowedCountryCode;
-  final String? allowedCountryName;
-  final String wrongCountryMessage;
-  final AutovalidateMode autovalidateMode;
-  final FormFieldValidator<String>? validator;
-
-  const OSMSearchFieldCompact({
-    Key? key,
-    required this.controller,
-    this.hintText = 'Rechercher une adresse...',
-    this.decoration,
-    this.textStyle,
-    this.borderColor = Colors.blue,
-    this.onTap,
-    this.readOnly = false,
-    this.backgroundColor = Colors.white,
-    this.prefixIcon = Icons.gps_fixed,
-    this.requiredField = false,
-    this.requiredMessage = 'Ce champ est requis',
-    this.allowedCountryCode,
-    this.allowedCountryName,
-    this.wrongCountryMessage = "L'adresse n'est pas dans le pays requis",
-    this.autovalidateMode = AutovalidateMode.onUserInteraction,
-    this.validator,
-  }) : super(key: key);
-
-  @override
-  Widget build(BuildContext context) {
-    return AnimatedBuilder(
-      animation: controller,
-      builder: (context, _) {
-        return TextFormField(
-          controller: controller.searchController,
-          focusNode: controller.focusNode,
-          style: textStyle,
-          readOnly: readOnly,
-          onTap: onTap,
-          autovalidateMode: autovalidateMode,
-          validator: validator ?? (value) {
-            final text = value?.trim() ?? '';
-            if (requiredField && text.isEmpty) {
-              return requiredMessage;
-            }
-            final cc = controller.lastCountryCode;
-            final cn = controller.lastCountryName;
-            if (allowedCountryCode != null && (cc == null || cc.toUpperCase() != allowedCountryCode!.toUpperCase())) {
-              final expected = allowedCountryName ?? allowedCountryCode;
-              return "$wrongCountryMessage (${expected})";
-            }
-            if (allowedCountryCode == null && allowedCountryName != null) {
-              if (cn == null || cn.toLowerCase() != allowedCountryName!.toLowerCase()) {
-                return "$wrongCountryMessage (${allowedCountryName})";
-              }
-            }
-            return null;
-          },
-          decoration: decoration ??
-              InputDecoration(
-                fillColor: backgroundColor,
-                filled: true,
-                hintText: hintText,
-                border: OutlineInputBorder(
-                  borderSide: BorderSide(color: borderColor),
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                focusedBorder: OutlineInputBorder(
-                  borderSide: BorderSide(color: borderColor, width: 2),
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                prefixIcon: Icon(prefixIcon, color: borderColor),
-              ),
-          onChanged: readOnly ? null : (value) => controller.searchLocation(value),
-        );
-      },
-    );
+    
+    if (validator != null) {
+      return validator!(address?['display_name'] ?? '');
+    }
+    
+    return null;
   }
 }
