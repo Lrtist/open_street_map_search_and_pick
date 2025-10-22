@@ -40,7 +40,7 @@ class OSMSearchField extends StatelessWidget {
   /// Retourne null si valide, sinon retourne le message d'erreur
   final String? Function(LatLng center, Map<String, dynamic>? address, OSMFormattedAddress? formatted)? validateOnChange;
 
-  const OSMSearchField({
+  OSMSearchField({
     Key? key,
     required this.controller,
     this.hintText = 'Rechercher une adresse...',
