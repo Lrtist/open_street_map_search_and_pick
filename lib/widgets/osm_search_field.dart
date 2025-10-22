@@ -5,6 +5,8 @@ import '../models/osm_formatted_address.dart';
 
 /// Widget de champ de recherche indépendant pour OpenStreetMap
 class OSMSearchField extends StatelessWidget {
+  // Key pour forcer la revalidation à chaque changement via contrôleur/carte
+  final GlobalKey<FormFieldState> _fieldKey = GlobalKey<FormFieldState>();
   final OSMController controller;
   final String hintText;
   final InputDecoration? decoration;
@@ -72,38 +74,45 @@ class OSMSearchField extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      margin: margin ?? const EdgeInsets.all(15),
-      constraints: maxHeight != null ? BoxConstraints(maxHeight: maxHeight!) : null,
-      child: Material(
-        elevation: 0,
-        borderRadius: borderRadius ?? BorderRadius.circular(8),
-        child: Container(
-          decoration: BoxDecoration(
-            color: backgroundColor,
+    return AnimatedBuilder(
+      animation: controller,
+      builder: (context, _) {
+        return Container(
+          margin: margin ?? const EdgeInsets.all(15),
+          constraints: maxHeight != null ? BoxConstraints(maxHeight: maxHeight!) : null,
+          child: Material(
+            elevation: 0,
             borderRadius: borderRadius ?? BorderRadius.circular(8),
-          ),
-          padding: padding ?? const EdgeInsets.all(8),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              _OSMFieldListeners(
-                controller: controller,
-                onLocationChanged: onLocationChanged,
-                onLocationChangedFormatted: onLocationChangedFormatted,
-                onAddressSelectedFormatted: onAddressSelectedFormatted,
+            child: Container(
+              decoration: BoxDecoration(
+                color: backgroundColor,
+                borderRadius: borderRadius ?? BorderRadius.circular(8),
               ),
-              _buildSearchField(),
-              if (showSuggestions) _buildSuggestionsList(),
-            ],
+              padding: padding ?? const EdgeInsets.all(8),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  _OSMFieldListeners(
+                    controller: controller,
+                    fieldKey: _fieldKey,
+                    onLocationChanged: onLocationChanged,
+                    onLocationChangedFormatted: onLocationChangedFormatted,
+                    onAddressSelectedFormatted: onAddressSelectedFormatted,
+                  ),
+                  _buildSearchField(),
+                  if (showSuggestions) _buildSuggestionsList(),
+                ],
+              ),
+            ),
           ),
-        ),
-      ),
+        );
+      },
     );
   }
 
   Widget _buildSearchField() {
     return TextFormField(
+      key: _fieldKey,
       controller: controller.searchController,
       focusNode: controller.focusNode,
       style: textStyle,
@@ -143,6 +152,43 @@ class OSMSearchField extends StatelessWidget {
     );
   }
 
+  Widget _buildSuggestionsList() {
+    if (controller.searchOptions.isEmpty) return const SizedBox.shrink();
+    final items = controller.searchOptions.take(maxSuggestions).toList();
+    return Container(
+      margin: const EdgeInsets.only(top: 8),
+      decoration: BoxDecoration(
+        color: backgroundColor,
+        borderRadius: borderRadius ?? BorderRadius.circular(8),
+        border: Border.all(color: borderColor, width: borderWidth),
+      ),
+      constraints: const BoxConstraints(maxHeight: 240),
+      child: ListView.separated(
+        shrinkWrap: true,
+        itemCount: items.length,
+        separatorBuilder: (_, __) => const Divider(height: 1),
+        itemBuilder: (context, index) {
+          final suggestion = items[index];
+          final onTap = () {
+            onAddressSelected?.call(suggestion);
+            controller.selectLocation(suggestion);
+          };
+          if (suggestionBuilder != null) {
+            return suggestionBuilder!(context, suggestion, onTap);
+          }
+          return ListTile(
+            title: Text(
+              suggestion.displayname,
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+            ),
+            onTap: onTap,
+          );
+        },
+      ),
+    );
+  }
+
   String? _validateAddress(LatLng? center, Map<String, dynamic>? address, OSMFormattedAddress? formatted) {
     if (requiredField && (center == null || address == null)) {
       return requiredMessage;
@@ -171,5 +217,81 @@ class OSMSearchField extends StatelessWidget {
     }
     
     return null;
+  }
+}
+
+/// Petit widget interne pour relayer les changements de position du contrôleur
+class _OSMFieldListeners extends StatefulWidget {
+  final OSMController controller;
+  final GlobalKey<FormFieldState> fieldKey;
+  final void Function(LatLng center, Map<String, dynamic>? address)? onLocationChanged;
+  final void Function(LatLng center, Map<String, dynamic>? address, OSMFormattedAddress? formatted)? onLocationChangedFormatted;
+  final void Function(OSMdata address, OSMFormattedAddress? formatted)? onAddressSelectedFormatted;
+
+  const _OSMFieldListeners({
+    Key? key,
+    required this.controller,
+    required this.fieldKey,
+    this.onLocationChanged,
+    this.onLocationChangedFormatted,
+    this.onAddressSelectedFormatted,
+  }) : super(key: key);
+
+  @override
+  State<_OSMFieldListeners> createState() => _OSMFieldListenersState();
+}
+
+class _OSMFieldListenersState extends State<_OSMFieldListeners> {
+  void _handler(LatLng c, Map<String, dynamic>? a) {
+    // Revalider le champ dès que l'adresse change
+    widget.fieldKey.currentState?.validate();
+    widget.onLocationChanged?.call(c, a);
+  }
+
+  void _handlerEx(LatLng c, Map<String, dynamic>? a, OSMFormattedAddress? f) {
+    widget.fieldKey.currentState?.validate();
+    widget.onLocationChangedFormatted?.call(c, a, f);
+  }
+
+  void _addressSelectedEx(OSMdata d, OSMFormattedAddress? f) {
+    widget.fieldKey.currentState?.validate();
+    widget.onAddressSelectedFormatted?.call(d, f);
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    widget.controller.addLocationChangedListener(_handler);
+    widget.controller.addLocationChangedExListener(_handlerEx);
+    widget.controller.addAddressSelectedExListener(_addressSelectedEx);
+    // Assurer que les événements carte sont attachés
+    widget.controller.ensureMapListener();
+  }
+
+  @override
+  void didUpdateWidget(covariant _OSMFieldListeners oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.controller != widget.controller) {
+      oldWidget.controller.removeLocationChangedListener(_handler);
+      oldWidget.controller.removeLocationChangedExListener(_handlerEx);
+      oldWidget.controller.removeAddressSelectedExListener(_addressSelectedEx);
+      widget.controller.addLocationChangedListener(_handler);
+      widget.controller.addLocationChangedExListener(_handlerEx);
+      widget.controller.addAddressSelectedExListener(_addressSelectedEx);
+      widget.controller.ensureMapListener();
+    }
+  }
+
+  @override
+  void dispose() {
+    widget.controller.removeLocationChangedListener(_handler);
+    widget.controller.removeLocationChangedExListener(_handlerEx);
+    widget.controller.removeAddressSelectedExListener(_addressSelectedEx);
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return const SizedBox.shrink();
   }
 }
