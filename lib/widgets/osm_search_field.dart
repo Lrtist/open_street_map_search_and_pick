@@ -74,39 +74,38 @@ class OSMSearchField extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return AnimatedBuilder(
-      animation: controller,
-      builder: (context, _) {
-        return Container(
-          margin: margin ?? const EdgeInsets.all(15),
-          constraints: maxHeight != null ? BoxConstraints(maxHeight: maxHeight!) : null,
-          child: Material(
-            elevation: 0,
+    return Container(
+      margin: margin ?? const EdgeInsets.all(15),
+      constraints: maxHeight != null ? BoxConstraints(maxHeight: maxHeight!) : null,
+      child: Material(
+        elevation: 0,
+        borderRadius: borderRadius ?? BorderRadius.circular(8),
+        child: Container(
+          decoration: BoxDecoration(
+            color: backgroundColor,
             borderRadius: borderRadius ?? BorderRadius.circular(8),
-            child: Container(
-              decoration: BoxDecoration(
-                color: backgroundColor,
-                borderRadius: borderRadius ?? BorderRadius.circular(8),
-              ),
-              padding: padding ?? const EdgeInsets.all(8),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  _OSMFieldListeners(
-                    controller: controller,
-                    fieldKey: _fieldKey,
-                    onLocationChanged: onLocationChanged,
-                    onLocationChangedFormatted: onLocationChangedFormatted,
-                    onAddressSelectedFormatted: onAddressSelectedFormatted,
-                  ),
-                  _buildSearchField(),
-                  if (showSuggestions) _buildSuggestionsList(),
-                ],
-              ),
-            ),
           ),
-        );
-      },
+          padding: padding ?? const EdgeInsets.all(8),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              _OSMFieldListeners(
+                controller: controller,
+                fieldKey: _fieldKey,
+                onLocationChanged: onLocationChanged,
+                onLocationChangedFormatted: onLocationChangedFormatted,
+                onAddressSelectedFormatted: onAddressSelectedFormatted,
+              ),
+              _buildSearchField(),
+              if (showSuggestions)
+                AnimatedBuilder(
+                  animation: controller,
+                  builder: (context, _) => _buildSuggestionsList(),
+                ),
+            ],
+          ),
+        ),
+      ),
     );
   }
 
@@ -193,29 +192,33 @@ class OSMSearchField extends StatelessWidget {
     if (requiredField && (center == null || address == null)) {
       return requiredMessage;
     }
-    
-    if (allowedCountryCode != null && address != null) {
-      final countryCode = address['address']?['country_code'];
-      final countryName = address['address']?['country'];
-      
-      if (countryCode != allowedCountryCode && 
-          (allowedCountryName == null || countryName != allowedCountryName)) {
-        return wrongCountryMessage;
-      }
-    }
-    
-    // Validation personnalisée via validateOnChange
+
+    // Validation personnalisée d'abord (après le check requis)
     if (center != null && validateOnChange != null) {
       final validationResult = validateOnChange!(center, address, formatted);
       if (validationResult != null) {
         return validationResult;
       }
     }
-    
-    if (validator != null) {
-      return validator!(address?['display_name'] ?? '');
+
+    // Validation de pays (insensible à la casse)
+    if (allowedCountryCode != null && address != null) {
+      // lastAddress correspond déjà à l'objet 'address' de Nominatim
+      final countryCode = (address['country_code'] as String?)?.toUpperCase();
+      final countryName = (address['country'] as String?)?.toLowerCase();
+      final expectedCode = allowedCountryCode!.toUpperCase();
+      final expectedName = allowedCountryName?.toLowerCase();
+
+      if (countryCode != expectedCode && (expectedName == null || countryName != expectedName)) {
+        return wrongCountryMessage;
+      }
     }
-    
+
+    if (validator != null) {
+      // Passer le texte courant du champ au validator utilisateur
+      return validator!(controller.searchController.text);
+    }
+
     return null;
   }
 }
