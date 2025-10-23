@@ -225,7 +225,6 @@ class OSMSearchField extends StatelessWidget {
       ),
     );
   }
-{{ ... }}
   String? _validateAddress(LatLng? center, Map<String, dynamic>? address, OSMFormattedAddress? formatted) {
     if (requiredField && (center == null || address == null)) {
       return requiredMessage;
