@@ -110,84 +110,122 @@ class OSMSearchField extends StatelessWidget {
   }
 
   Widget _buildSearchField() {
-    return TextFormField(
-      key: _fieldKey,
-      controller: controller.searchController,
-      focusNode: controller.focusNode,
-      style: textStyle,
-      decoration: decoration ??
-          InputDecoration(
-            hintText: hintText,
-            hintStyle: TextStyle(color: hintTextColor),
-            border: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(8),
-              borderSide: BorderSide(color: borderColor, width: borderWidth),
-            ),
-            enabledBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(8),
-              borderSide: BorderSide(color: borderColor, width: borderWidth),
-            ),
-            focusedBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(8),
-              borderSide: BorderSide(color: borderColor, width: borderWidth * 1.5),
-            ),
-            prefixIcon: Icon(prefixIcon, color: borderColor),
-            filled: true,
-            fillColor: backgroundColor,
+    return ValueListenableBuilder<TextEditingValue>(
+      valueListenable: controller.searchController,
+      builder: (context, value, child) {
+        final hasText = value.text.isNotEmpty;
+        final baseDecoration = decoration ?? InputDecoration(
+          hintText: hintText,
+          hintStyle: TextStyle(color: hintTextColor),
+          border: OutlineInputBorder(
+            borderRadius: borderRadius ?? BorderRadius.circular(8),
+            borderSide: BorderSide(color: borderColor, width: borderWidth),
           ),
-      onChanged: (value) {
-        if (!controller.focusNode.hasFocus) {
-          controller.focusNode.requestFocus();
-        }
-        controller.searchLocation(value);
+          enabledBorder: OutlineInputBorder(
+            borderRadius: borderRadius ?? BorderRadius.circular(8),
+            borderSide: BorderSide(color: borderColor, width: borderWidth),
+          ),
+          focusedBorder: OutlineInputBorder(
+            borderRadius: borderRadius ?? BorderRadius.circular(8),
+            borderSide: BorderSide(color: borderColor, width: borderWidth * 1.5),
+          ),
+          prefixIcon: Icon(prefixIcon, color: borderColor),
+          filled: true,
+          fillColor: backgroundColor,
+        );
+
+        return TextFormField(
+          key: _fieldKey,
+          controller: controller.searchController,
+          focusNode: controller.focusNode,
+          style: textStyle,
+          decoration: baseDecoration.copyWith(
+            // Bouton effacer quand il y a du texte
+            suffixIcon: hasText
+                ? IconButton(
+                    tooltip: 'Effacer',
+                    icon: const Icon(Icons.clear),
+                    color: borderColor,
+                    onPressed: () {
+                      controller.searchController.clear();
+                      controller.clearSearchOptions();
+                      // garder le focus dans le champ
+                      controller.focusNode.requestFocus();
+                    },
+                  )
+                : null,
+          ),
+          onChanged: (value) {
+            if (!controller.focusNode.hasFocus) {
+              controller.focusNode.requestFocus();
+            }
+            controller.searchLocation(value);
+          },
+          validator: (value) {
+            final center = controller.lastCenter;
+            final address = controller.lastAddress;
+            final formatted = controller.lastFormattedAddress;
+            return _validateAddress(center, address, formatted);
+          },
+          autovalidateMode: autovalidateMode,
+        );
       },
-      validator: (value) {
-        final center = controller.lastCenter;
-        final address = controller.lastAddress;
-        final formatted = controller.lastFormattedAddress;
-        return _validateAddress(center, address, formatted);
-      },
-      autovalidateMode: autovalidateMode,
     );
   }
 
   Widget _buildSuggestionsList() {
     if (controller.searchOptions.isEmpty) return const SizedBox.shrink();
     final items = controller.searchOptions.take(maxSuggestions).toList();
-    return Container(
-      margin: const EdgeInsets.only(top: 8),
-      decoration: BoxDecoration(
-        color: backgroundColor,
-        borderRadius: borderRadius ?? BorderRadius.circular(8),
-        border: Border.all(color: borderColor, width: borderWidth),
-      ),
-      constraints: const BoxConstraints(maxHeight: 240),
-      child: ListView.separated(
-        shrinkWrap: true,
-        itemCount: items.length,
-        separatorBuilder: (_, __) => const Divider(height: 1),
-        itemBuilder: (context, index) {
-          final suggestion = items[index];
-          final onTap = () {
-            onAddressSelected?.call(suggestion);
-            controller.selectLocation(suggestion);
-          };
-          if (suggestionBuilder != null) {
-            return suggestionBuilder!(context, suggestion, onTap);
-          }
-          return ListTile(
-            title: Text(
-              suggestion.displayname,
-              maxLines: 2,
-              overflow: TextOverflow.ellipsis,
-            ),
-            onTap: onTap,
-          );
-        },
+    return FocusTraversalGroup(
+      // Empêche le panneau de suggestions de capter le focus clavier
+      descendantsAreFocusable: false,
+      child: Container(
+        margin: const EdgeInsets.only(top: 8),
+        decoration: BoxDecoration(
+          color: backgroundColor,
+          // Border radius dédié aux suggestions: ne pas réutiliser le paramètre du champ
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(color: borderColor, width: borderWidth),
+        ),
+        constraints: const BoxConstraints(maxHeight: 240),
+        child: ListView.separated(
+          shrinkWrap: true,
+          primary: false,
+          physics: const ClampingScrollPhysics(),
+          keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.manual,
+          itemCount: items.length,
+          separatorBuilder: (_, __) => const Divider(height: 1),
+          itemBuilder: (context, index) {
+            final suggestion = items[index];
+            final onTap = () {
+              onAddressSelected?.call(suggestion);
+              controller.selectLocation(suggestion);
+            };
+            if (suggestionBuilder != null) {
+              return Focus(
+                canRequestFocus: false,
+                descendantsAreFocusable: false,
+                child: suggestionBuilder!(context, suggestion, onTap),
+              );
+            }
+            return Focus(
+              canRequestFocus: false,
+              descendantsAreFocusable: false,
+              child: ListTile(
+                title: Text(
+                  suggestion.displayname,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                ),
+                onTap: onTap,
+              ),
+            );
+          },
+        ),
       ),
     );
   }
-
+{{ ... }}
   String? _validateAddress(LatLng? center, Map<String, dynamic>? address, OSMFormattedAddress? formatted) {
     if (requiredField && (center == null || address == null)) {
       return requiredMessage;
