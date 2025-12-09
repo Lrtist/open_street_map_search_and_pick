@@ -4,14 +4,14 @@ import '../controllers/osm_controller.dart';
 import '../models/osm_formatted_address.dart';
 
 /// Widget de champ de recherche indépendant pour OpenStreetMap
-class OSMSearchField extends StatelessWidget {
-  // Key pour forcer la revalidation à chaque changement via contrôleur/carte
-  final GlobalKey<FormFieldState> _fieldKey = GlobalKey<FormFieldState>();
+class OSMSearchField extends StatefulWidget {
   final OSMController controller;
   final String hintText;
   final InputDecoration? decoration;
   final TextStyle? textStyle;
+  final TextStyle? errorStyle;
   final Color borderColor;
+  final Color errorBorderColor;
   final double borderWidth;
   final BorderRadius? borderRadius;
   final EdgeInsetsGeometry? margin;
@@ -40,12 +40,14 @@ class OSMSearchField extends StatelessWidget {
   /// Retourne null si valide, sinon retourne le message d'erreur
   final String? Function(LatLng center, Map<String, dynamic>? address, OSMFormattedAddress? formatted)? validateOnChange;
 
-  OSMSearchField({
+  const OSMSearchField({
     Key? key,
     required this.controller,
     this.hintText = 'Rechercher une adresse...',
     this.decoration,
     this.textStyle,
+    this.errorStyle,
+    this.errorBorderColor = Colors.red,
     this.borderColor = Colors.blue,
     this.borderWidth = 1.0,
     this.borderRadius,
@@ -73,33 +75,42 @@ class OSMSearchField extends StatelessWidget {
   }) : super(key: key);
 
   @override
+  State<OSMSearchField> createState() => _OSMSearchFieldState();
+
+}
+
+class _OSMSearchFieldState extends State<OSMSearchField> {
+  // Key pour forcer la revalidation à chaque changement via contrôleur/carte
+  final GlobalKey<FormFieldState> _fieldKey = GlobalKey<FormFieldState>();
+
+  @override
   Widget build(BuildContext context) {
     return Container(
-      margin: margin ?? const EdgeInsets.all(15),
-      constraints: maxHeight != null ? BoxConstraints(maxHeight: maxHeight!) : null,
+      margin: widget.margin ?? const EdgeInsets.all(15),
+      constraints: widget.maxHeight != null ? BoxConstraints(maxHeight: widget.maxHeight!) : null,
       child: Material(
         elevation: 0,
-        borderRadius: borderRadius ?? BorderRadius.circular(8),
+        borderRadius: widget.borderRadius ?? BorderRadius.circular(8),
         child: Container(
           decoration: BoxDecoration(
-            color: backgroundColor,
-            borderRadius: borderRadius ?? BorderRadius.circular(8),
+            color: widget.backgroundColor,
+            borderRadius: widget.borderRadius ?? BorderRadius.circular(8),
           ),
-          padding: padding ?? const EdgeInsets.all(8),
+          padding: widget.padding ?? const EdgeInsets.all(8),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
               _OSMFieldListeners(
-                controller: controller,
+                controller: widget.controller,
                 fieldKey: _fieldKey,
-                onLocationChanged: onLocationChanged,
-                onLocationChangedFormatted: onLocationChangedFormatted,
-                onAddressSelectedFormatted: onAddressSelectedFormatted,
+                onLocationChanged: widget.onLocationChanged,
+                onLocationChangedFormatted: widget.onLocationChangedFormatted,
+                onAddressSelectedFormatted: widget.onAddressSelectedFormatted,
               ),
               _buildSearchField(),
-              if (showSuggestions)
+              if (widget.showSuggestions)
                 AnimatedBuilder(
-                  animation: controller,
+                  animation: widget.controller,
                   builder: (context, _) => _buildSuggestionsList(),
                 ),
             ],
@@ -111,81 +122,86 @@ class OSMSearchField extends StatelessWidget {
 
   Widget _buildSearchField() {
     return ValueListenableBuilder<TextEditingValue>(
-      valueListenable: controller.searchController,
+      valueListenable: widget.controller.searchController,
       builder: (context, value, child) {
         final hasText = value.text.isNotEmpty;
-        final baseDecoration = decoration ?? InputDecoration(
-          hintText: hintText,
-          hintStyle: TextStyle(color: hintTextColor),
+        final baseDecoration = (widget.decoration ?? InputDecoration(
+          hintText: widget.hintText,
+          hintStyle: TextStyle(color: widget.hintTextColor),
           border: OutlineInputBorder(
-            borderRadius: borderRadius ?? BorderRadius.circular(8),
-            borderSide: BorderSide(color: borderColor, width: borderWidth),
+            borderRadius: widget.borderRadius ?? BorderRadius.circular(8),
+            borderSide: BorderSide(color: widget.borderColor, width: widget.borderWidth),
           ),
           enabledBorder: OutlineInputBorder(
-            borderRadius: borderRadius ?? BorderRadius.circular(8),
-            borderSide: BorderSide(color: borderColor, width: borderWidth),
+            borderRadius: widget.borderRadius ?? BorderRadius.circular(8),
+            borderSide: BorderSide(color: widget.borderColor, width: widget.borderWidth),
           ),
           focusedBorder: OutlineInputBorder(
-            borderRadius: borderRadius ?? BorderRadius.circular(8),
-            borderSide: BorderSide(color: borderColor, width: borderWidth * 1.5),
+            borderRadius: widget.borderRadius ?? BorderRadius.circular(8),
+            borderSide: BorderSide(color: widget.borderColor, width: widget.borderWidth * 1.5),
           ),
-          prefixIcon: Icon(prefixIcon, color: borderColor),
+          errorBorder: OutlineInputBorder(
+            borderSide:
+                BorderSide(width: 1, color: widget.errorBorderColor), 
+            borderRadius: BorderRadius.circular(borderRadius),
+          ),
+          prefixIcon: Icon(widget.prefixIcon, color: widget.borderColor),
           filled: true,
-          fillColor: backgroundColor,
-        );
+          fillColor: widget.backgroundColor,
+        )).copyWith(errorStyle: widget.errorStyle);
 
         return TextFormField(
           key: _fieldKey,
-          controller: controller.searchController,
-          focusNode: controller.focusNode,
-          style: textStyle,
+          controller: widget.controller.searchController,
+          focusNode: widget.controller.focusNode,
+          style: widget.textStyle,
           decoration: baseDecoration.copyWith(
             // Bouton effacer quand il y a du texte
             suffixIcon: hasText
                 ? IconButton(
                     tooltip: 'Effacer',
                     icon: const Icon(Icons.clear),
-                    color: borderColor,
+                    color: widget.borderColor,
                     onPressed: () {
-                      controller.searchController.clear();
-                      controller.clearSearchOptions();
+                      widget.controller.searchController.clear();
+                      widget.controller.clearSearchOptions();
                       // garder le focus dans le champ
-                      controller.focusNode.requestFocus();
+                      widget.controller.focusNode.requestFocus();
                     },
                   )
                 : null,
           ),
           onChanged: (value) {
-            if (!controller.focusNode.hasFocus) {
-              controller.focusNode.requestFocus();
+            if (!widget.controller.focusNode.hasFocus) {
+              widget.controller.focusNode.requestFocus();
             }
-            controller.searchLocation(value);
+            widget.controller.searchLocation(value);
           },
           validator: (value) {
-            final center = controller.lastCenter;
-            final address = controller.lastAddress;
-            final formatted = controller.lastFormattedAddress;
+            final center = widget.controller.lastCenter;
+            final address = widget.controller.lastAddress;
+            final formatted = widget.controller.lastFormattedAddress;
             return _validateAddress(center, address, formatted);
           },
-          autovalidateMode: autovalidateMode,
+          autovalidateMode: widget.autovalidateMode,
         );
       },
     );
   }
 
   Widget _buildSuggestionsList() {
-    if (controller.searchOptions.isEmpty) return const SizedBox.shrink();
-    final items = controller.searchOptions.take(maxSuggestions).toList();
+    if (widget.controller.searchOptions.isEmpty) return const SizedBox.shrink();
+    final items = widget.controller.searchOptions.take(widget.maxSuggestions).toList();
     return FocusTraversalGroup(
       // Empêche le panneau de suggestions de capter le focus clavier
       descendantsAreFocusable: false,
       child: Container(
         margin: const EdgeInsets.only(top: 8),
         decoration: BoxDecoration(
-          color: backgroundColor,
+          color: widget.backgroundColor,
           // Border radius dédié aux suggestions: ne pas réutiliser le paramètre du champ
           borderRadius: BorderRadius.circular(8),
-          border: Border.all(color: borderColor, width: borderWidth),
+          border: Border.all(color: widget.borderColor, width: widget.borderWidth),
         ),
         constraints: const BoxConstraints(maxHeight: 240),
         child: ListView.separated(
@@ -198,14 +214,14 @@ class OSMSearchField extends StatelessWidget {
           itemBuilder: (context, index) {
             final suggestion = items[index];
             final onTap = () {
-              onAddressSelected?.call(suggestion);
-              controller.selectLocation(suggestion);
+              widget.onAddressSelected?.call(suggestion);
+              widget.controller.selectLocation(suggestion);
             };
-            if (suggestionBuilder != null) {
+            if (widget.suggestionBuilder != null) {
               return Focus(
                 canRequestFocus: false,
                 descendantsAreFocusable: false,
-                child: suggestionBuilder!(context, suggestion, onTap),
+                child: widget.suggestionBuilder!(context, suggestion, onTap),
               );
             }
             return Focus(
@@ -225,35 +241,36 @@ class OSMSearchField extends StatelessWidget {
       ),
     );
   }
+
   String? _validateAddress(LatLng? center, Map<String, dynamic>? address, OSMFormattedAddress? formatted) {
-    if (requiredField && (center == null || address == null)) {
-      return requiredMessage;
+    if (widget.requiredField && (center == null || address == null)) {
+      return widget.requiredMessage;
     }
 
     // Validation personnalisée d'abord (après le check requis)
-    if (center != null && validateOnChange != null) {
-      final validationResult = validateOnChange!(center, address, formatted);
+    if (center != null && widget.validateOnChange != null) {
+      final validationResult = widget.validateOnChange!(center, address, formatted);
       if (validationResult != null) {
         return validationResult;
       }
     }
 
     // Validation de pays (insensible à la casse)
-    if (allowedCountryCode != null && address != null) {
+    if (widget.allowedCountryCode != null && address != null) {
       // lastAddress correspond déjà à l'objet 'address' de Nominatim
       final countryCode = (address['country_code'] as String?)?.toUpperCase();
       final countryName = (address['country'] as String?)?.toLowerCase();
-      final expectedCode = allowedCountryCode!.toUpperCase();
-      final expectedName = allowedCountryName?.toLowerCase();
+      final expectedCode = widget.allowedCountryCode!.toUpperCase();
+      final expectedName = widget.allowedCountryName?.toLowerCase();
 
       if (countryCode != expectedCode && (expectedName == null || countryName != expectedName)) {
-        return wrongCountryMessage;
+        return widget.wrongCountryMessage;
       }
     }
 
-    if (validator != null) {
+    if (widget.validator != null) {
       // Passer le texte courant du champ au validator utilisateur
-      return validator!(controller.searchController.text);
+      return widget.validator!(widget.controller.searchController.text);
     }
 
     return null;
