@@ -143,7 +143,7 @@ class _OSMSearchFieldState extends State<OSMSearchField> {
           errorBorder: OutlineInputBorder(
             borderSide:
                 BorderSide(width: 1, color: widget.errorBorderColor), 
-            borderRadius: BorderRadius.circular(borderRadius),
+            borderRadius: widget.borderRadius ?? BorderRadius.circular(8),
           ),
           prefixIcon: Icon(widget.prefixIcon, color: widget.borderColor),
           filled: true,
